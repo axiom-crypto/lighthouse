@@ -9,6 +9,9 @@ name = "benches"
 harness = false
 
 [dependencies]
+ssz_rs = { git = "https://github.com/ralexstokes/ssz-rs", rev = "84ef2b71aa004f6767420badb42c902ad56b8b72" }
+ssz_rs_derive = { git = "https://github.com/ralexstokes/ssz-rs", rev = "84ef2b71aa004f6767420badb42c902ad56b8b72" }
+ethereum_consensus = { git = "https://github.com/ralexstokes/ethereum-consensus", package = "ethereum-consensus", branch = "main" }
 merkle_proof = { workspace = true }
 bls = { workspace = true, features = ["arbitrary"] }
 kzg = { workspace = true }

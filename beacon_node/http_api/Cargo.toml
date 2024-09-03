@@ -6,6 +6,7 @@ edition = { workspace = true }
 autotests = false                               # using a single test binary compiles faster
 
 [dependencies]
+ssz_rs = { git = "https://github.com/ralexstokes/ssz-rs", rev = "84ef2b71aa004f6767420badb42c902ad56b8b72" }
 warp = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }

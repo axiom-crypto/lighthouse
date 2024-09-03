@@ -60,6 +60,7 @@ use serde::{Deserialize, Serialize};
 use slog::{crit, debug, error, info, warn, Logger};
 use slot_clock::SlotClock;
 use ssz::Encode;
+use ssz_rs::{GeneralizedIndexable, HashTreeRoot, MerkleizationError, PathElement, Prove};
 pub use state_id::StateId;
 use std::future::Future;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -77,6 +78,7 @@ use tokio_stream::{
     wrappers::{errors::BroadcastStreamRecvError, BroadcastStream},
     StreamExt,
 };
+use types::beacon_state_copy::BeaconState2;
 use types::{
     fork_versioned_response::EmptyMetadata, Attestation, AttestationData, AttestationShufflingId,
     AttesterSlashing, BeaconStateError, CommitteeCache, ConfigAndPreset, Epoch, EthSpec, ForkName,
@@ -2623,6 +2625,51 @@ pub fn serve<T: BeaconChainTypes>(
             },
         );
 
+    // GET debug2/beacon/states/{state_id}
+    let get_debug_beacon_states2 = any_version
+        .and(warp::path("debug2"))
+        .and(warp::path("beacon"))
+        .and(warp::path("states"))
+        .and(warp::path::param::<StateId>().or_else(|_| async {
+            Err(warp_utils::reject::custom_bad_request(
+                "Invalid state ID".to_string(),
+            ))
+        }))
+        .and(warp::path::end())
+        .and(warp::header::optional::<api_types::Accept>("accept"))
+        .and(task_spawner_filter.clone())
+        .and(chain_filter.clone())
+        .then(
+            |endpoint_version: EndpointVersion,
+             state_id: StateId,
+             accept_header: Option<api_types::Accept>,
+             task_spawner: TaskSpawner<T::EthSpec>,
+             chain: Arc<BeaconChain<T>>| {
+                task_spawner.blocking_response_task(Priority::P1, move || match accept_header {
+                    Some(api_types::Accept::Ssz) => panic!("JSON Only"),
+                    _ => {
+                        let (state_, _execution_optimistic, _finalized) = state_id.state(&chain)?;
+                        let fork_name = state_
+                            .fork_name(&chain.spec)
+                            .map_err(inconsistent_fork_rejection)?;
+                        let state = BeaconState2::from(state_);
+
+                        let path = &[
+                            PathElement::Field("latest_execution_payload_header".to_owned()),
+                            PathElement::Field("block_hash".to_owned()),
+                        ];
+
+                        let (proof, witness) = state.as_deneb().unwrap().prove(path).unwrap();
+
+                        Ok(add_consensus_version_header(
+                            warp::reply::json(&_execution_optimistic).into_response(),
+                            fork_name,
+                        ))
+                    }
+                })
+            },
+        );
+
     // GET debug/beacon/heads
     let get_debug_beacon_heads = any_version
         .and(warp::path("debug"))
@@ -4457,6 +4504,7 @@ pub fn serve<T: BeaconChainTypes>(
                 .uor(get_config_spec)
                 .uor(get_config_deposit_contract)
                 .uor(get_debug_beacon_states)
+                .uor(get_debug_beacon_states2)
                 .uor(get_debug_beacon_heads)
                 .uor(get_debug_fork_choice)
                 .uor(get_node_identity)
