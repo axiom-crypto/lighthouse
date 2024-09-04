@@ -8,8 +8,16 @@ use ethereum_consensus::{
     deneb::{
         self,
         mainnet::{
-            BYTES_PER_LOGS_BLOOM, HISTORICAL_ROOTS_LIMIT, MAX_EXTRA_DATA_BYTES,
-            SLOTS_PER_HISTORICAL_ROOT,
+            BYTES_PER_LOGS_BLOOM as MAINNET_BYTES_PER_LOGS_BLOOM,
+            HISTORICAL_ROOTS_LIMIT as MAINNET_HISTORICAL_ROOTS_LIMIT,
+            MAX_EXTRA_DATA_BYTES as MAINNET_MAX_EXTRA_DATA_BYTES,
+            SLOTS_PER_HISTORICAL_ROOT as MAINNET_SLOTS_PER_HISTORICAL_ROOT,
+        },
+        minimal::{
+            BYTES_PER_LOGS_BLOOM as MINIMAL_BYTES_PER_LOGS_BLOOM,
+            HISTORICAL_ROOTS_LIMIT as MINIMAL_HISTORICAL_ROOTS_LIMIT,
+            MAX_EXTRA_DATA_BYTES as MINIMAL_MAX_EXTRA_DATA_BYTES,
+            SLOTS_PER_HISTORICAL_ROOT as MINIMAL_SLOTS_PER_HISTORICAL_ROOT,
         },
     },
     phase0::{beacon_block::BeaconBlockHeader, U256},
@@ -28,6 +36,8 @@ use tree_hash::TreeHash;
     variants(Base, Altair, Bellatrix, Capella, Deneb, Electra),
     variant_attributes(
         derive(Derivative, Debug, PartialEq, SimpleSerialize),
+        // serde(bound = "P: Params", deny_unknown_fields),
+        // arbitrary(bound = "P: Params"),
         derivative(Clone)
     ),
     specific_variant_attributes(
@@ -41,7 +51,7 @@ use tree_hash::TreeHash;
                 ),
                 map_beacon_state_summary_base_tree_list_fields_immutable(groups(tree_lists)),
             ),
-            bimappings(bimap_BeaconStateSummary_base_tree_list_fields(
+            bimappings(bimap_beacon_state_summary_base_tree_list_fields(
                 other_type = "BeaconStateSummaryBase",
                 self_mutable,
                 fallible,
@@ -145,7 +155,10 @@ use tree_hash::TreeHash;
     map_ref_mut_into(BeaconStateRef)
 )]
 #[derive(Debug, PartialEq, Clone)]
-pub struct BeaconStateSummary {
+pub struct BeaconStateSummary<
+    const SLOTS_PER_HISTORICAL_ROOT: usize,
+    const HISTORICAL_ROOTS_LIMIT: usize,
+> {
     // Versioning
     #[superstruct(getter(copy))]
     #[metastruct(exclude_from(tree_lists))]
@@ -245,22 +258,24 @@ pub struct BeaconStateSummary {
         partial_getter(rename = "latest_execution_payload_header_bellatrix")
     )]
     #[metastruct(exclude_from(tree_lists))]
-    pub latest_execution_payload_header:
-        bellatrix::ExecutionPayloadHeader<BYTES_PER_LOGS_BLOOM, MAX_EXTRA_DATA_BYTES>,
+    pub latest_execution_payload_header: bellatrix::ExecutionPayloadHeader<
+        MAINNET_BYTES_PER_LOGS_BLOOM,
+        MAINNET_MAX_EXTRA_DATA_BYTES,
+    >,
     #[superstruct(
         only(Capella),
         partial_getter(rename = "latest_execution_payload_header_capella")
     )]
     #[metastruct(exclude_from(tree_lists))]
     pub latest_execution_payload_header:
-        capella::ExecutionPayloadHeader<BYTES_PER_LOGS_BLOOM, MAX_EXTRA_DATA_BYTES>,
+        capella::ExecutionPayloadHeader<MAINNET_BYTES_PER_LOGS_BLOOM, MAINNET_MAX_EXTRA_DATA_BYTES>,
     #[superstruct(
         only(Deneb),
         partial_getter(rename = "latest_execution_payload_header_deneb")
     )]
     #[metastruct(exclude_from(tree_lists))]
     pub latest_execution_payload_header:
-        deneb::ExecutionPayloadHeader<BYTES_PER_LOGS_BLOOM, MAX_EXTRA_DATA_BYTES>,
+        deneb::ExecutionPayloadHeader<MAINNET_BYTES_PER_LOGS_BLOOM, MAINNET_MAX_EXTRA_DATA_BYTES>,
     // #[superstruct(
     //     only(Electra),
     //     partial_getter(rename = "latest_execution_payload_header_electra")
@@ -313,7 +328,13 @@ pub struct BeaconStateSummary {
     // pub pending_consolidations: List<PendingConsolidation, E::PendingConsolidationsLimit>,
 }
 
-fn convert_common_fields<E: EthSpec>(state: &BeaconState<E>) -> BeaconStateSummaryCommonFields
+fn to_beacon_state_summary_common_fields<
+    E: EthSpec,
+    const SLOTS_PER_HISTORICAL_ROOT: usize,
+    const HISTORICAL_ROOTS_LIMIT: usize,
+>(
+    state: &BeaconState<E>,
+) -> BeaconStateSummaryCommonFields<SLOTS_PER_HISTORICAL_ROOT, HISTORICAL_ROOTS_LIMIT>
 where
     E: EthSpec,
 {
@@ -373,7 +394,7 @@ where
         .into();
     let finalized_checkpoint = state.finalized_checkpoint().tree_hash_root().0.into();
 
-    BeaconStateSummaryCommonFields {
+    BeaconStateSummaryCommonFields::<SLOTS_PER_HISTORICAL_ROOT, HISTORICAL_ROOTS_LIMIT> {
         genesis_time,
         genesis_validators_root,
         slot,
@@ -397,7 +418,10 @@ where
 }
 
 /// This is the list of common fields for BeaconStateSummary
-pub struct BeaconStateSummaryCommonFields {
+pub struct BeaconStateSummaryCommonFields<
+    const SLOTS_PER_HISTORICAL_ROOT: usize,
+    const HISTORICAL_ROOTS_LIMIT: usize,
+> {
     pub genesis_time: u64,
     pub genesis_validators_root: Root,
     pub slot: Slot,
@@ -427,7 +451,32 @@ pub struct BeaconStateSummaryCommonFields {
     pub finalized_checkpoint: Root,
 }
 
-impl<E: EthSpec> From<BeaconState<E>> for BeaconStateSummary {
+pub trait NetworkParams {
+    const SLOTS_PER_HISTORICAL_ROOT: usize;
+    const HISTORICAL_ROOTS_LIMIT: usize;
+    const BYTES_PER_LOGS_BLOOM: usize;
+    const MAX_EXTRA_DATA_BYTES: usize;
+}
+
+pub struct MainnetParams;
+impl NetworkParams for MainnetParams {
+    const SLOTS_PER_HISTORICAL_ROOT: usize = MAINNET_SLOTS_PER_HISTORICAL_ROOT;
+    const HISTORICAL_ROOTS_LIMIT: usize = MAINNET_HISTORICAL_ROOTS_LIMIT;
+    const BYTES_PER_LOGS_BLOOM: usize = MAINNET_BYTES_PER_LOGS_BLOOM;
+    const MAX_EXTRA_DATA_BYTES: usize = MAINNET_MAX_EXTRA_DATA_BYTES;
+}
+
+pub struct MinimalParams;
+impl NetworkParams for MinimalParams {
+    const SLOTS_PER_HISTORICAL_ROOT: usize = MAINNET_SLOTS_PER_HISTORICAL_ROOT;
+    const HISTORICAL_ROOTS_LIMIT: usize = MAINNET_HISTORICAL_ROOTS_LIMIT;
+    const BYTES_PER_LOGS_BLOOM: usize = MAINNET_BYTES_PER_LOGS_BLOOM;
+    const MAX_EXTRA_DATA_BYTES: usize = MAINNET_MAX_EXTRA_DATA_BYTES;
+}
+
+impl<E: EthSpec, const SLOTS_PER_HISTORICAL_ROOT: usize, const HISTORICAL_ROOTS_LIMIT: usize>
+    From<BeaconState<E>> for BeaconStateSummary<SLOTS_PER_HISTORICAL_ROOT, HISTORICAL_ROOTS_LIMIT>
+{
     fn from(state: BeaconState<E>) -> Self {
         let BeaconStateSummaryCommonFields {
             genesis_time,
@@ -449,7 +498,7 @@ impl<E: EthSpec> From<BeaconState<E>> for BeaconStateSummary {
             previous_justified_checkpoint,
             current_justified_checkpoint,
             finalized_checkpoint,
-        } = convert_common_fields(&state);
+        } = to_beacon_state_summary_common_fields(&state);
 
         match state {
             BeaconState::Base(state) => BeaconStateSummary::Base(BeaconStateSummaryBase {

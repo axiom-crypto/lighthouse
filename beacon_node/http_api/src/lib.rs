@@ -78,12 +78,12 @@ use tokio_stream::{
     wrappers::{errors::BroadcastStreamRecvError, BroadcastStream},
     StreamExt,
 };
-use types::beacon_state_summary::BeaconStateSummary;
+use types::beacon_state_summary::{BeaconStateSummary, MainnetParams, NetworkParams};
 use types::{
     fork_versioned_response::EmptyMetadata, Attestation, AttestationData, AttestationShufflingId,
-    AttesterSlashing, BeaconStateError, CommitteeCache, ConfigAndPreset, Epoch, EthSpec, ForkName,
-    ForkVersionedResponse, Hash256, ProposerPreparationData, ProposerSlashing, RelativeEpoch,
-    SignedAggregateAndProof, SignedBlindedBeaconBlock, SignedBlsToExecutionChange,
+    AttesterSlashing, BeaconStateError, CommitteeCache, ConfigAndPreset, Epoch, EthSpec, EthSpecId,
+    ForkName, ForkVersionedResponse, Hash256, ProposerPreparationData, ProposerSlashing,
+    RelativeEpoch, SignedAggregateAndProof, SignedBlindedBeaconBlock, SignedBlsToExecutionChange,
     SignedContributionAndProof, SignedValidatorRegistrationData, SignedVoluntaryExit, Slot,
     SyncCommitteeMessage, SyncContributionData,
 };
@@ -2652,7 +2652,21 @@ pub fn serve<T: BeaconChainTypes>(
                         let fork_name = state_
                             .fork_name(&chain.spec)
                             .map_err(inconsistent_fork_rejection)?;
-                        let state = BeaconStateSummary::from(state_);
+
+                        let spec_id = T::EthSpec::spec_name();
+
+                        match spec_id {
+                            EthSpecId::Mainnet => {
+                                todo!()
+                            }
+                            EthSpecId::Minimal | EthSpecId::Gnosis => {
+                                println!("dd")
+                            }
+                        };
+                        let state = BeaconStateSummary::<
+                            { MainnetParams::SLOTS_PER_HISTORICAL_ROOT },
+                            { MainnetParams::HISTORICAL_ROOTS_LIMIT },
+                        >::from(state_);
 
                         let path = &[
                             PathElement::Field("latest_execution_payload_header".to_owned()),
