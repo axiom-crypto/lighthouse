@@ -34,7 +34,11 @@ use tree_hash::TreeHash;
         Base(metastruct(
             mappings(
                 map_beacon_state_summary_base_fields(),
-                map_beacon_state_summary_base_tree_list_fields(mutable, fallible, groups(tree_lists)),
+                map_beacon_state_summary_base_tree_list_fields(
+                    mutable,
+                    fallible,
+                    groups(tree_lists)
+                ),
                 map_beacon_state_summary_base_tree_list_fields_immutable(groups(tree_lists)),
             ),
             bimappings(bimap_BeaconStateSummary_base_tree_list_fields(
@@ -48,7 +52,11 @@ use tree_hash::TreeHash;
         Altair(metastruct(
             mappings(
                 map_beacon_state_summary_altair_fields(),
-                map_beacon_state_summary_altair_tree_list_fields(mutable, fallible, groups(tree_lists)),
+                map_beacon_state_summary_altair_tree_list_fields(
+                    mutable,
+                    fallible,
+                    groups(tree_lists)
+                ),
                 map_beacon_state_summary_altair_tree_list_fields_immutable(groups(tree_lists)),
             ),
             bimappings(bimap_beacon_state_summary_altair_tree_list_fields(
@@ -80,7 +88,11 @@ use tree_hash::TreeHash;
         Capella(metastruct(
             mappings(
                 map_beacon_state_summary_capella_fields(),
-                map_beacon_state_summary_capella_tree_list_fields(mutable, fallible, groups(tree_lists)),
+                map_beacon_state_summary_capella_tree_list_fields(
+                    mutable,
+                    fallible,
+                    groups(tree_lists)
+                ),
                 map_beacon_state_summary_capella_tree_list_fields_immutable(groups(tree_lists)),
             ),
             bimappings(bimap_beacon_state_summary_capella_tree_list_fields(
@@ -94,7 +106,11 @@ use tree_hash::TreeHash;
         Deneb(metastruct(
             mappings(
                 map_beacon_state_summary_deneb_fields(),
-                map_beacon_state_summary_deneb_tree_list_fields(mutable, fallible, groups(tree_lists)),
+                map_beacon_state_summary_deneb_tree_list_fields(
+                    mutable,
+                    fallible,
+                    groups(tree_lists)
+                ),
                 map_beacon_state_summary_deneb_tree_list_fields_immutable(groups(tree_lists)),
             ),
             bimappings(bimap_beacon_state_summary_deneb_tree_list_fields(
@@ -108,7 +124,11 @@ use tree_hash::TreeHash;
         Electra(metastruct(
             mappings(
                 map_beacon_state_summary_electra_fields(),
-                map_beacon_state_summary_electra_tree_list_fields(mutable, fallible, groups(tree_lists)),
+                map_beacon_state_summary_electra_tree_list_fields(
+                    mutable,
+                    fallible,
+                    groups(tree_lists)
+                ),
                 map_beacon_state_summary_electra_tree_list_fields_immutable(groups(tree_lists)),
             ),
             bimappings(bimap_beacon_state_summary_electra_tree_list_fields(
@@ -293,49 +313,165 @@ pub struct BeaconStateSummary {
     // pub pending_consolidations: List<PendingConsolidation, E::PendingConsolidationsLimit>,
 }
 
+fn convert_common_fields<E: EthSpec>(state: &BeaconState<E>) -> BeaconStateSummaryCommonFields
+where
+    E: EthSpec,
+{
+    let genesis_time = state.genesis_time();
+    let genesis_validators_root = state.genesis_validators_root().0.into();
+    let slot: Slot = state.slot().into();
+
+    let fork = Fork {
+        previous_version: state.fork().previous_version,
+        current_version: state.fork().current_version,
+        epoch: state.fork().epoch.into(),
+    };
+
+    let latest_block_header = BeaconBlockHeader {
+        slot: state.latest_block_header().slot.into(),
+        proposer_index: state.latest_block_header().proposer_index as usize,
+        parent_root: state.latest_block_header().parent_root.0.into(),
+        state_root: state.latest_block_header().state_root.0.into(),
+        body_root: state.latest_block_header().body_root.0.into(),
+    };
+
+    let block_roots = state.block_roots().tree_hash_root().0.into();
+    let state_roots = Vector::try_from(
+        state
+            .state_roots()
+            .into_iter()
+            .map(|x| x.0.into())
+            .collect::<Vec<Root>>(),
+    )
+    .unwrap();
+    let historical_roots = List::try_from(
+        state
+            .historical_roots()
+            .into_iter()
+            .map(|x| x.0.into())
+            .collect::<Vec<Root>>(),
+    )
+    .unwrap();
+
+    let eth1_data = state.eth1_data().tree_hash_root().0.into();
+    let eth1_data_votes = state.eth1_data_votes().tree_hash_root().0.into();
+    let eth1_deposit_index = state.eth1_deposit_index();
+    let validators = state.validators().tree_hash_root().0.into();
+    let balances = state.balances().tree_hash_root().0.into();
+    let randao_mixes = state.randao_mixes().tree_hash_root().0.into();
+    let slashings = state.slashings().tree_hash_root().0.into();
+    let justification_bits = state.justification_bits().tree_hash_root().0.into();
+    let previous_justified_checkpoint = state
+        .previous_justified_checkpoint()
+        .tree_hash_root()
+        .0
+        .into();
+    let current_justified_checkpoint = state
+        .current_justified_checkpoint()
+        .tree_hash_root()
+        .0
+        .into();
+    let finalized_checkpoint = state.finalized_checkpoint().tree_hash_root().0.into();
+
+    BeaconStateSummaryCommonFields {
+        genesis_time,
+        genesis_validators_root,
+        slot,
+        fork,
+        latest_block_header,
+        block_roots,
+        state_roots,
+        historical_roots,
+        eth1_data,
+        eth1_data_votes,
+        eth1_deposit_index,
+        validators,
+        balances,
+        randao_mixes,
+        slashings,
+        justification_bits,
+        previous_justified_checkpoint,
+        current_justified_checkpoint,
+        finalized_checkpoint,
+    }
+}
+
+/// This is the list of common fields for BeaconStateSummary
+pub struct BeaconStateSummaryCommonFields {
+    pub genesis_time: u64,
+    pub genesis_validators_root: Root,
+    pub slot: Slot,
+    pub fork: Fork,
+
+    // History
+    pub latest_block_header: BeaconBlockHeader,
+    pub block_roots: Root,
+    pub state_roots: Vector<Root, SLOTS_PER_HISTORICAL_ROOT>,
+    // Frozen in Capella, replaced by historical_summaries
+    pub historical_roots: List<Root, HISTORICAL_ROOTS_LIMIT>,
+
+    pub eth1_data: Root,
+    pub eth1_data_votes: Root,
+    pub eth1_deposit_index: u64,
+
+    pub validators: Root,
+    pub balances: Root,
+
+    // Randomness
+    pub randao_mixes: Root,
+    pub slashings: Root,
+
+    pub justification_bits: Root,
+    pub previous_justified_checkpoint: Root,
+    pub current_justified_checkpoint: Root,
+    pub finalized_checkpoint: Root,
+}
+
 impl<E: EthSpec> From<BeaconState<E>> for BeaconStateSummary {
     fn from(state: BeaconState<E>) -> Self {
+        let BeaconStateSummaryCommonFields {
+            genesis_time,
+            genesis_validators_root,
+            slot,
+            fork,
+            latest_block_header,
+            block_roots,
+            state_roots,
+            historical_roots,
+            eth1_data,
+            eth1_data_votes,
+            eth1_deposit_index,
+            validators,
+            balances,
+            randao_mixes,
+            slashings,
+            justification_bits,
+            previous_justified_checkpoint,
+            current_justified_checkpoint,
+            finalized_checkpoint,
+        } = convert_common_fields(&state);
+
         match state {
             BeaconState::Base(state) => BeaconStateSummary::Base(BeaconStateSummaryBase {
-                genesis_time: state.genesis_time,
-                genesis_validators_root: state.genesis_validators_root.0.into(),
-                slot: state.slot.into(),
-                fork: Fork {
-                    previous_version: state.fork.previous_version,
-                    current_version: state.fork.current_version,
-                    epoch: state.fork.epoch.into(),
-                },
-                latest_block_header: BeaconBlockHeader {
-                    slot: state.latest_block_header.slot.into(),
-                    proposer_index: state.latest_block_header.proposer_index as usize,
-                    parent_root: state.latest_block_header.parent_root.0.into(),
-                    state_root: state.latest_block_header.state_root.0.into(),
-                    body_root: state.latest_block_header.body_root.0.into(),
-                },
-                block_roots: state.block_roots.tree_hash_root().0.into(),
-                state_roots: Vector::try_from(
-                    state
-                        .state_roots
-                        .into_iter()
-                        .map(|x| x.0.into())
-                        .collect::<Vec<Root>>(),
-                )
-                .unwrap(),
-                historical_roots: List::try_from(
-                    state
-                        .historical_roots
-                        .into_iter()
-                        .map(|x| x.0.into())
-                        .collect::<Vec<Root>>(),
-                )
-                .unwrap(),
-                eth1_data: state.eth1_data.tree_hash_root().0.into(),
-                eth1_data_votes: state.eth1_data_votes.tree_hash_root().0.into(),
-                eth1_deposit_index: state.eth1_deposit_index,
-                validators: state.validators.tree_hash_root().0.into(),
-                balances: state.balances.tree_hash_root().0.into(),
-                randao_mixes: state.randao_mixes.tree_hash_root().0.into(),
-                slashings: state.slashings.tree_hash_root().0.into(),
+                genesis_time,
+                genesis_validators_root,
+                slot,
+                fork,
+                latest_block_header,
+                block_roots,
+                state_roots,
+                historical_roots,
+                eth1_data,
+                eth1_data_votes,
+                eth1_deposit_index,
+                validators,
+                balances,
+                randao_mixes,
+                slashings,
+                justification_bits,
+                previous_justified_checkpoint,
+                current_justified_checkpoint,
+                finalized_checkpoint,
                 previous_epoch_attestations: state
                     .previous_epoch_attestations
                     .tree_hash_root()
@@ -346,71 +482,27 @@ impl<E: EthSpec> From<BeaconState<E>> for BeaconStateSummary {
                     .tree_hash_root()
                     .0
                     .into(),
-                justification_bits: state.justification_bits.tree_hash_root().0.into(),
-                previous_justified_checkpoint: state
-                    .previous_justified_checkpoint
-                    .tree_hash_root()
-                    .0
-                    .into(),
-                current_justified_checkpoint: state
-                    .current_justified_checkpoint
-                    .tree_hash_root()
-                    .0
-                    .into(),
-                finalized_checkpoint: state.finalized_checkpoint.tree_hash_root().0.into(),
             }),
             BeaconState::Altair(state) => BeaconStateSummary::Altair(BeaconStateSummaryAltair {
-                genesis_time: state.genesis_time,
-                genesis_validators_root: state.genesis_validators_root.0.into(),
-                slot: state.slot.into(),
-                fork: Fork {
-                    previous_version: state.fork.previous_version,
-                    current_version: state.fork.current_version,
-                    epoch: state.fork.epoch.into(),
-                },
-                latest_block_header: BeaconBlockHeader {
-                    slot: state.latest_block_header.slot.into(),
-                    proposer_index: state.latest_block_header.proposer_index as usize,
-                    parent_root: state.latest_block_header.parent_root.0.into(),
-                    state_root: state.latest_block_header.state_root.0.into(),
-                    body_root: state.latest_block_header.body_root.0.into(),
-                },
-                block_roots: state.block_roots.tree_hash_root().0.into(),
-                state_roots: Vector::try_from(
-                    state
-                        .state_roots
-                        .into_iter()
-                        .map(|x| x.0.into())
-                        .collect::<Vec<Root>>(),
-                )
-                .unwrap(),
-                historical_roots: List::try_from(
-                    state
-                        .historical_roots
-                        .into_iter()
-                        .map(|x| x.0.into())
-                        .collect::<Vec<Root>>(),
-                )
-                .unwrap(),
-                eth1_data: state.eth1_data.tree_hash_root().0.into(),
-                eth1_data_votes: state.eth1_data_votes.tree_hash_root().0.into(),
-                eth1_deposit_index: state.eth1_deposit_index,
-                validators: state.validators.tree_hash_root().0.into(),
-                balances: state.balances.tree_hash_root().0.into(),
-                randao_mixes: state.randao_mixes.tree_hash_root().0.into(),
-                slashings: state.slashings.tree_hash_root().0.into(),
-                justification_bits: state.justification_bits.tree_hash_root().0.into(),
-                previous_justified_checkpoint: state
-                    .previous_justified_checkpoint
-                    .tree_hash_root()
-                    .0
-                    .into(),
-                current_justified_checkpoint: state
-                    .current_justified_checkpoint
-                    .tree_hash_root()
-                    .0
-                    .into(),
-                finalized_checkpoint: state.finalized_checkpoint.tree_hash_root().0.into(),
+                genesis_time,
+                genesis_validators_root,
+                slot,
+                fork,
+                latest_block_header,
+                block_roots,
+                state_roots,
+                historical_roots,
+                eth1_data,
+                eth1_data_votes,
+                eth1_deposit_index,
+                validators,
+                balances,
+                randao_mixes,
+                slashings,
+                justification_bits,
+                previous_justified_checkpoint,
+                current_justified_checkpoint,
+                finalized_checkpoint,
                 current_epoch_participation: state
                     .current_epoch_participation
                     .tree_hash_root()
@@ -425,196 +517,134 @@ impl<E: EthSpec> From<BeaconState<E>> for BeaconStateSummary {
                 next_sync_committee: state.next_sync_committee.tree_hash_root().0.into(),
                 inactivity_scores: state.inactivity_scores.tree_hash_root().0.into(),
             }),
-            BeaconState::Merge(state) => BeaconStateSummary::Bellatrix(BeaconStateSummaryBellatrix {
-                genesis_time: state.genesis_time,
-                genesis_validators_root: state.genesis_validators_root.0.into(),
-                slot: state.slot.into(),
-                fork: Fork {
-                    previous_version: state.fork.previous_version,
-                    current_version: state.fork.current_version,
-                    epoch: state.fork.epoch.into(),
-                },
-                latest_block_header: BeaconBlockHeader {
-                    slot: state.latest_block_header.slot.into(),
-                    proposer_index: state.latest_block_header.proposer_index as usize,
-                    parent_root: state.latest_block_header.parent_root.0.into(),
-                    state_root: state.latest_block_header.state_root.0.into(),
-                    body_root: state.latest_block_header.body_root.0.into(),
-                },
-                block_roots: state.block_roots.tree_hash_root().0.into(),
-                state_roots: Vector::try_from(
-                    state
-                        .state_roots
-                        .into_iter()
-                        .map(|x| x.0.into())
-                        .collect::<Vec<Root>>(),
-                )
-                .unwrap(),
-                historical_roots: List::try_from(
-                    state
-                        .historical_roots
-                        .into_iter()
-                        .map(|x| x.0.into())
-                        .collect::<Vec<Root>>(),
-                )
-                .unwrap(),
-                eth1_data: state.eth1_data.tree_hash_root().0.into(),
-                eth1_data_votes: state.eth1_data_votes.tree_hash_root().0.into(),
-                eth1_deposit_index: state.eth1_deposit_index,
-                validators: state.validators.tree_hash_root().0.into(),
-                balances: state.balances.tree_hash_root().0.into(),
-                randao_mixes: state.randao_mixes.tree_hash_root().0.into(),
-                slashings: state.slashings.tree_hash_root().0.into(),
-                justification_bits: state.justification_bits.tree_hash_root().0.into(),
-                previous_justified_checkpoint: state
-                    .previous_justified_checkpoint
-                    .tree_hash_root()
-                    .0
-                    .into(),
-                current_justified_checkpoint: state
-                    .current_justified_checkpoint
-                    .tree_hash_root()
-                    .0
-                    .into(),
-                finalized_checkpoint: state.finalized_checkpoint.tree_hash_root().0.into(),
-                current_epoch_participation: state
-                    .current_epoch_participation
-                    .tree_hash_root()
-                    .0
-                    .into(),
-                previous_epoch_participation: state
-                    .previous_epoch_participation
-                    .tree_hash_root()
-                    .0
-                    .into(),
-                current_sync_committee: state.current_sync_committee.tree_hash_root().0.into(),
-                next_sync_committee: state.next_sync_committee.tree_hash_root().0.into(),
-                inactivity_scores: state.inactivity_scores.tree_hash_root().0.into(),
-                latest_execution_payload_header: bellatrix::ExecutionPayloadHeader {
-                    parent_hash: state
-                        .latest_execution_payload_header
-                        .parent_hash
+            BeaconState::Merge(state) => {
+                BeaconStateSummary::Bellatrix(BeaconStateSummaryBellatrix {
+                    genesis_time,
+                    genesis_validators_root,
+                    slot,
+                    fork,
+                    latest_block_header,
+                    block_roots,
+                    state_roots,
+                    historical_roots,
+                    eth1_data,
+                    eth1_data_votes,
+                    eth1_deposit_index,
+                    validators,
+                    balances,
+                    randao_mixes,
+                    slashings,
+                    justification_bits,
+                    previous_justified_checkpoint,
+                    current_justified_checkpoint,
+                    finalized_checkpoint,
+                    current_epoch_participation: state
+                        .current_epoch_participation
+                        .tree_hash_root()
                         .0
-                         .0
-                        .as_slice()
-                        .try_into()
-                        .unwrap(),
-                    fee_recipient: state
-                        .latest_execution_payload_header
-                        .fee_recipient
+                        .into(),
+                    previous_epoch_participation: state
+                        .previous_epoch_participation
+                        .tree_hash_root()
                         .0
-                        .as_slice()
-                        .try_into()
-                        .unwrap(),
-                    state_root: state
-                        .latest_execution_payload_header
-                        .state_root
-                        .0
-                        .as_slice()
-                        .try_into()
-                        .unwrap(),
-                    receipts_root: state
-                        .latest_execution_payload_header
-                        .receipts_root
-                        .0
-                        .as_slice()
-                        .try_into()
-                        .unwrap(),
-                    logs_bloom: state
-                        .latest_execution_payload_header
-                        .logs_bloom
-                        .as_ref()
-                        .try_into()
-                        .unwrap(),
-                    prev_randao: state
-                        .latest_execution_payload_header
-                        .prev_randao
-                        .0
-                        .as_slice()
-                        .try_into()
-                        .unwrap(),
-                    block_number: state.latest_execution_payload_header.block_number,
-                    gas_limit: state.latest_execution_payload_header.gas_limit,
-                    gas_used: state.latest_execution_payload_header.gas_used,
-                    timestamp: state.latest_execution_payload_header.timestamp,
-                    extra_data: state
-                        .latest_execution_payload_header
-                        .extra_data
-                        .as_ref()
-                        .try_into()
-                        .unwrap(),
-                    base_fee_per_gas: U256::from_limbs(
-                        state.latest_execution_payload_header.base_fee_per_gas.0,
-                    ),
-                    block_hash: state
-                        .latest_execution_payload_header
-                        .block_hash
-                        .0
-                         .0
-                        .as_slice()
-                        .try_into()
-                        .unwrap(),
-                    transactions_root: state
-                        .latest_execution_payload_header
-                        .transactions_root
-                        .0
-                        .as_slice()
-                        .try_into()
-                        .unwrap(),
-                },
-            }),
+                        .into(),
+                    current_sync_committee: state.current_sync_committee.tree_hash_root().0.into(),
+                    next_sync_committee: state.next_sync_committee.tree_hash_root().0.into(),
+                    inactivity_scores: state.inactivity_scores.tree_hash_root().0.into(),
+                    latest_execution_payload_header: bellatrix::ExecutionPayloadHeader {
+                        parent_hash: state
+                            .latest_execution_payload_header
+                            .parent_hash
+                            .0
+                             .0
+                            .as_slice()
+                            .try_into()
+                            .unwrap(),
+                        fee_recipient: state
+                            .latest_execution_payload_header
+                            .fee_recipient
+                            .0
+                            .as_slice()
+                            .try_into()
+                            .unwrap(),
+                        state_root: state
+                            .latest_execution_payload_header
+                            .state_root
+                            .0
+                            .as_slice()
+                            .try_into()
+                            .unwrap(),
+                        receipts_root: state
+                            .latest_execution_payload_header
+                            .receipts_root
+                            .0
+                            .as_slice()
+                            .try_into()
+                            .unwrap(),
+                        logs_bloom: state
+                            .latest_execution_payload_header
+                            .logs_bloom
+                            .as_ref()
+                            .try_into()
+                            .unwrap(),
+                        prev_randao: state
+                            .latest_execution_payload_header
+                            .prev_randao
+                            .0
+                            .as_slice()
+                            .try_into()
+                            .unwrap(),
+                        block_number: state.latest_execution_payload_header.block_number,
+                        gas_limit: state.latest_execution_payload_header.gas_limit,
+                        gas_used: state.latest_execution_payload_header.gas_used,
+                        timestamp: state.latest_execution_payload_header.timestamp,
+                        extra_data: state
+                            .latest_execution_payload_header
+                            .extra_data
+                            .as_ref()
+                            .try_into()
+                            .unwrap(),
+                        base_fee_per_gas: U256::from_limbs(
+                            state.latest_execution_payload_header.base_fee_per_gas.0,
+                        ),
+                        block_hash: state
+                            .latest_execution_payload_header
+                            .block_hash
+                            .0
+                             .0
+                            .as_slice()
+                            .try_into()
+                            .unwrap(),
+                        transactions_root: state
+                            .latest_execution_payload_header
+                            .transactions_root
+                            .0
+                            .as_slice()
+                            .try_into()
+                            .unwrap(),
+                    },
+                })
+            }
             BeaconState::Capella(state) => BeaconStateSummary::Capella(BeaconStateSummaryCapella {
-                genesis_time: state.genesis_time,
-                genesis_validators_root: state.genesis_validators_root.0.into(),
-                slot: state.slot.into(),
-                fork: Fork {
-                    previous_version: state.fork.previous_version,
-                    current_version: state.fork.current_version,
-                    epoch: state.fork.epoch.into(),
-                },
-                latest_block_header: BeaconBlockHeader {
-                    slot: state.latest_block_header.slot.into(),
-                    proposer_index: state.latest_block_header.proposer_index as usize,
-                    parent_root: state.latest_block_header.parent_root.0.into(),
-                    state_root: state.latest_block_header.state_root.0.into(),
-                    body_root: state.latest_block_header.body_root.0.into(),
-                },
-                block_roots: state.block_roots.tree_hash_root().0.into(),
-                state_roots: Vector::try_from(
-                    state
-                        .state_roots
-                        .into_iter()
-                        .map(|x| x.0.into())
-                        .collect::<Vec<Root>>(),
-                )
-                .unwrap(),
-                historical_roots: List::try_from(
-                    state
-                        .historical_roots
-                        .into_iter()
-                        .map(|x| x.0.into())
-                        .collect::<Vec<Root>>(),
-                )
-                .unwrap(),
-                eth1_data: state.eth1_data.tree_hash_root().0.into(),
-                eth1_data_votes: state.eth1_data_votes.tree_hash_root().0.into(),
-                eth1_deposit_index: state.eth1_deposit_index,
-                validators: state.validators.tree_hash_root().0.into(),
-                balances: state.balances.tree_hash_root().0.into(),
-                randao_mixes: state.randao_mixes.tree_hash_root().0.into(),
-                slashings: state.slashings.tree_hash_root().0.into(),
-                justification_bits: state.justification_bits.tree_hash_root().0.into(),
-                previous_justified_checkpoint: state
-                    .previous_justified_checkpoint
-                    .tree_hash_root()
-                    .0
-                    .into(),
-                current_justified_checkpoint: state
-                    .current_justified_checkpoint
-                    .tree_hash_root()
-                    .0
-                    .into(),
-                finalized_checkpoint: state.finalized_checkpoint.tree_hash_root().0.into(),
+                genesis_time,
+                genesis_validators_root,
+                slot,
+                fork,
+                latest_block_header,
+                block_roots,
+                state_roots,
+                historical_roots,
+                eth1_data,
+                eth1_data_votes,
+                eth1_deposit_index,
+                validators,
+                balances,
+                randao_mixes,
+                slashings,
+                justification_bits,
+                previous_justified_checkpoint,
+                current_justified_checkpoint,
+                finalized_checkpoint,
                 current_epoch_participation: state
                     .current_epoch_participation
                     .tree_hash_root()
@@ -722,57 +752,25 @@ impl<E: EthSpec> From<BeaconState<E>> for BeaconStateSummary {
                 .unwrap(),
             }),
             BeaconState::Deneb(state) => BeaconStateSummary::Deneb(BeaconStateSummaryDeneb {
-                genesis_time: state.genesis_time,
-                genesis_validators_root: state.genesis_validators_root.0.into(),
-                slot: state.slot.into(),
-                fork: Fork {
-                    previous_version: state.fork.previous_version,
-                    current_version: state.fork.current_version,
-                    epoch: state.fork.epoch.into(),
-                },
-                latest_block_header: BeaconBlockHeader {
-                    slot: state.latest_block_header.slot.into(),
-                    proposer_index: state.latest_block_header.proposer_index as usize,
-                    parent_root: state.latest_block_header.parent_root.0.into(),
-                    state_root: state.latest_block_header.state_root.0.into(),
-                    body_root: state.latest_block_header.body_root.0.into(),
-                },
-                block_roots: state.block_roots.tree_hash_root().0.into(),
-                state_roots: Vector::try_from(
-                    state
-                        .state_roots
-                        .into_iter()
-                        .map(|x| x.0.into())
-                        .collect::<Vec<Root>>(),
-                )
-                .unwrap(),
-                historical_roots: List::try_from(
-                    state
-                        .historical_roots
-                        .into_iter()
-                        .map(|x| x.0.into())
-                        .collect::<Vec<Root>>(),
-                )
-                .unwrap(),
-                eth1_data: state.eth1_data.tree_hash_root().0.into(),
-                eth1_data_votes: state.eth1_data_votes.tree_hash_root().0.into(),
-                eth1_deposit_index: state.eth1_deposit_index,
-                validators: state.validators.tree_hash_root().0.into(),
-                balances: state.balances.tree_hash_root().0.into(),
-                randao_mixes: state.randao_mixes.tree_hash_root().0.into(),
-                slashings: state.slashings.tree_hash_root().0.into(),
-                justification_bits: state.justification_bits.tree_hash_root().0.into(),
-                previous_justified_checkpoint: state
-                    .previous_justified_checkpoint
-                    .tree_hash_root()
-                    .0
-                    .into(),
-                current_justified_checkpoint: state
-                    .current_justified_checkpoint
-                    .tree_hash_root()
-                    .0
-                    .into(),
-                finalized_checkpoint: state.finalized_checkpoint.tree_hash_root().0.into(),
+                genesis_time,
+                genesis_validators_root,
+                slot,
+                fork,
+                latest_block_header,
+                block_roots,
+                state_roots,
+                historical_roots,
+                eth1_data,
+                eth1_data_votes,
+                eth1_deposit_index,
+                validators,
+                balances,
+                randao_mixes,
+                slashings,
+                justification_bits,
+                previous_justified_checkpoint,
+                current_justified_checkpoint,
+                finalized_checkpoint,
                 current_epoch_participation: state
                     .current_epoch_participation
                     .tree_hash_root()
