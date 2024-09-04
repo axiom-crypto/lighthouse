@@ -78,7 +78,7 @@ use tokio_stream::{
     wrappers::{errors::BroadcastStreamRecvError, BroadcastStream},
     StreamExt,
 };
-use types::beacon_state_copy::BeaconState2;
+use types::beacon_state_summary::BeaconStateSummary;
 use types::{
     fork_versioned_response::EmptyMetadata, Attestation, AttestationData, AttestationShufflingId,
     AttesterSlashing, BeaconStateError, CommitteeCache, ConfigAndPreset, Epoch, EthSpec, ForkName,
@@ -2652,7 +2652,7 @@ pub fn serve<T: BeaconChainTypes>(
                         let fork_name = state_
                             .fork_name(&chain.spec)
                             .map_err(inconsistent_fork_rejection)?;
-                        let state = BeaconState2::from(state_);
+                        let state = BeaconStateSummary::from(state_);
 
                         let path = &[
                             PathElement::Field("latest_execution_payload_header".to_owned()),

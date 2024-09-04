@@ -33,12 +33,12 @@ use tree_hash::TreeHash;
     specific_variant_attributes(
         Base(metastruct(
             mappings(
-                map_beacon_state2_base_fields(),
-                map_beacon_state2_base_tree_list_fields(mutable, fallible, groups(tree_lists)),
-                map_beacon_state2_base_tree_list_fields_immutable(groups(tree_lists)),
+                map_beacon_state_summary_base_fields(),
+                map_beacon_state_summary_base_tree_list_fields(mutable, fallible, groups(tree_lists)),
+                map_beacon_state_summary_base_tree_list_fields_immutable(groups(tree_lists)),
             ),
-            bimappings(bimap_beacon_state2_base_tree_list_fields(
-                other_type = "BeaconState2Base",
+            bimappings(bimap_BeaconStateSummary_base_tree_list_fields(
+                other_type = "BeaconStateSummaryBase",
                 self_mutable,
                 fallible,
                 groups(tree_lists)
@@ -47,12 +47,12 @@ use tree_hash::TreeHash;
         )),
         Altair(metastruct(
             mappings(
-                map_beacon_state2_altair_fields(),
-                map_beacon_state2_altair_tree_list_fields(mutable, fallible, groups(tree_lists)),
-                map_beacon_state2_altair_tree_list_fields_immutable(groups(tree_lists)),
+                map_beacon_state_summary_altair_fields(),
+                map_beacon_state_summary_altair_tree_list_fields(mutable, fallible, groups(tree_lists)),
+                map_beacon_state_summary_altair_tree_list_fields_immutable(groups(tree_lists)),
             ),
-            bimappings(bimap_beacon_state2_altair_tree_list_fields(
-                other_type = "BeaconState2Altair",
+            bimappings(bimap_beacon_state_summary_altair_tree_list_fields(
+                other_type = "BeaconStateSummaryAltair",
                 self_mutable,
                 fallible,
                 groups(tree_lists)
@@ -61,16 +61,16 @@ use tree_hash::TreeHash;
         )),
         Bellatrix(metastruct(
             mappings(
-                map_beacon_state2_bellatrix_fields(),
-                map_beacon_state2_bellatrix_tree_list_fields(
+                map_beacon_state_summary_bellatrix_fields(),
+                map_beacon_state_summary_bellatrix_tree_list_fields(
                     mutable,
                     fallible,
                     groups(tree_lists)
                 ),
-                map_beacon_state2_bellatrix_tree_list_fields_immutable(groups(tree_lists)),
+                map_beacon_state_summary_bellatrix_tree_list_fields_immutable(groups(tree_lists)),
             ),
-            bimappings(bimap_beacon_state2_bellatrix_tree_list_fields(
-                other_type = "BeaconState2Bellatrix",
+            bimappings(bimap_beacon_state_summary_bellatrix_tree_list_fields(
+                other_type = "BeaconStateSummaryBellatrix",
                 self_mutable,
                 fallible,
                 groups(tree_lists)
@@ -79,12 +79,12 @@ use tree_hash::TreeHash;
         )),
         Capella(metastruct(
             mappings(
-                map_beacon_state2_capella_fields(),
-                map_beacon_state2_capella_tree_list_fields(mutable, fallible, groups(tree_lists)),
-                map_beacon_state2_capella_tree_list_fields_immutable(groups(tree_lists)),
+                map_beacon_state_summary_capella_fields(),
+                map_beacon_state_summary_capella_tree_list_fields(mutable, fallible, groups(tree_lists)),
+                map_beacon_state_summary_capella_tree_list_fields_immutable(groups(tree_lists)),
             ),
-            bimappings(bimap_beacon_state2_capella_tree_list_fields(
-                other_type = "BeaconState2Capella",
+            bimappings(bimap_beacon_state_summary_capella_tree_list_fields(
+                other_type = "BeaconStateSummaryCapella",
                 self_mutable,
                 fallible,
                 groups(tree_lists)
@@ -93,12 +93,12 @@ use tree_hash::TreeHash;
         )),
         Deneb(metastruct(
             mappings(
-                map_beacon_state2_deneb_fields(),
-                map_beacon_state2_deneb_tree_list_fields(mutable, fallible, groups(tree_lists)),
-                map_beacon_state2_deneb_tree_list_fields_immutable(groups(tree_lists)),
+                map_beacon_state_summary_deneb_fields(),
+                map_beacon_state_summary_deneb_tree_list_fields(mutable, fallible, groups(tree_lists)),
+                map_beacon_state_summary_deneb_tree_list_fields_immutable(groups(tree_lists)),
             ),
-            bimappings(bimap_beacon_state2_deneb_tree_list_fields(
-                other_type = "BeaconState2Deneb",
+            bimappings(bimap_beacon_state_summary_deneb_tree_list_fields(
+                other_type = "BeaconStateSummaryDeneb",
                 self_mutable,
                 fallible,
                 groups(tree_lists)
@@ -107,12 +107,12 @@ use tree_hash::TreeHash;
         )),
         Electra(metastruct(
             mappings(
-                map_beacon_state2_electra_fields(),
-                map_beacon_state2_electra_tree_list_fields(mutable, fallible, groups(tree_lists)),
-                map_beacon_state2_electra_tree_list_fields_immutable(groups(tree_lists)),
+                map_beacon_state_summary_electra_fields(),
+                map_beacon_state_summary_electra_tree_list_fields(mutable, fallible, groups(tree_lists)),
+                map_beacon_state_summary_electra_tree_list_fields_immutable(groups(tree_lists)),
             ),
-            bimappings(bimap_beacon_state2_electra_tree_list_fields(
-                other_type = "BeaconState2Electra",
+            bimappings(bimap_beacon_state_summary_electra_tree_list_fields(
+                other_type = "BeaconStateSummaryElectra",
                 self_mutable,
                 fallible,
                 groups(tree_lists)
@@ -125,7 +125,7 @@ use tree_hash::TreeHash;
     map_ref_mut_into(BeaconStateRef)
 )]
 #[derive(Debug, PartialEq, Clone)]
-pub struct BeaconState2 {
+pub struct BeaconStateSummary {
     // Versioning
     #[superstruct(getter(copy))]
     #[metastruct(exclude_from(tree_lists))]
@@ -293,10 +293,10 @@ pub struct BeaconState2 {
     // pub pending_consolidations: List<PendingConsolidation, E::PendingConsolidationsLimit>,
 }
 
-impl<E: EthSpec> From<BeaconState<E>> for BeaconState2 {
+impl<E: EthSpec> From<BeaconState<E>> for BeaconStateSummary {
     fn from(state: BeaconState<E>) -> Self {
         match state {
-            BeaconState::Base(state) => BeaconState2::Base(BeaconState2Base {
+            BeaconState::Base(state) => BeaconStateSummary::Base(BeaconStateSummaryBase {
                 genesis_time: state.genesis_time,
                 genesis_validators_root: state.genesis_validators_root.0.into(),
                 slot: state.slot.into(),
@@ -359,7 +359,7 @@ impl<E: EthSpec> From<BeaconState<E>> for BeaconState2 {
                     .into(),
                 finalized_checkpoint: state.finalized_checkpoint.tree_hash_root().0.into(),
             }),
-            BeaconState::Altair(state) => BeaconState2::Altair(BeaconState2Altair {
+            BeaconState::Altair(state) => BeaconStateSummary::Altair(BeaconStateSummaryAltair {
                 genesis_time: state.genesis_time,
                 genesis_validators_root: state.genesis_validators_root.0.into(),
                 slot: state.slot.into(),
@@ -425,7 +425,7 @@ impl<E: EthSpec> From<BeaconState<E>> for BeaconState2 {
                 next_sync_committee: state.next_sync_committee.tree_hash_root().0.into(),
                 inactivity_scores: state.inactivity_scores.tree_hash_root().0.into(),
             }),
-            BeaconState::Merge(state) => BeaconState2::Bellatrix(BeaconState2Bellatrix {
+            BeaconState::Merge(state) => BeaconStateSummary::Bellatrix(BeaconStateSummaryBellatrix {
                 genesis_time: state.genesis_time,
                 genesis_validators_root: state.genesis_validators_root.0.into(),
                 slot: state.slot.into(),
@@ -563,7 +563,7 @@ impl<E: EthSpec> From<BeaconState<E>> for BeaconState2 {
                         .unwrap(),
                 },
             }),
-            BeaconState::Capella(state) => BeaconState2::Capella(BeaconState2Capella {
+            BeaconState::Capella(state) => BeaconStateSummary::Capella(BeaconStateSummaryCapella {
                 genesis_time: state.genesis_time,
                 genesis_validators_root: state.genesis_validators_root.0.into(),
                 slot: state.slot.into(),
@@ -721,7 +721,7 @@ impl<E: EthSpec> From<BeaconState<E>> for BeaconState2 {
                 )
                 .unwrap(),
             }),
-            BeaconState::Deneb(state) => BeaconState2::Deneb(BeaconState2Deneb {
+            BeaconState::Deneb(state) => BeaconStateSummary::Deneb(BeaconStateSummaryDeneb {
                 genesis_time: state.genesis_time,
                 genesis_validators_root: state.genesis_validators_root.0.into(),
                 slot: state.slot.into(),
