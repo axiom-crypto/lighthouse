@@ -493,6 +493,7 @@ fn convert_historical_summaries<T: EthSpec, const HISTORICAL_ROOTS_LIMIT: usize>
     )
     .unwrap()
 }
+
 pub trait NetworkParams {
     const SLOTS_PER_HISTORICAL_ROOT: usize;
     const HISTORICAL_ROOTS_LIMIT: usize;
