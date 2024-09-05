@@ -24,12 +24,22 @@ use ethereum_consensus::{
     primitives::{Root, Slot},
     ssz::prelude::{List, Vector},
 };
+use hex::encode;
 use metastruct::metastruct;
 pub use milhouse::interface::Interface;
-use ssz_rs::{GeneralizedIndexable, HashTreeRoot, MerkleizationError, PathElement};
+use ssz_rs::{
+    GeneralizedIndexable, HashTreeRoot, MerkleizationError, Node, PathElement,
+    Serialize as SszSerialize,
+};
 use ssz_rs_derive::SimpleSerialize;
 use superstruct::superstruct;
 use tree_hash::TreeHash;
+
+pub fn encode_node(node: &Node) -> String {
+    let mut buffer = Vec::new();
+    node.serialize(&mut buffer).unwrap();
+    encode(&buffer)
+}
 
 /// The state of the `BeaconChain` at some slot.
 #[superstruct(
@@ -329,6 +339,7 @@ pub struct BeaconStateSummary<
 }
 
 /// This is the list of common fields for BeaconStateSummary
+
 pub struct BeaconStateSummaryCommonFields<
     const SLOTS_PER_HISTORICAL_ROOT: usize,
     const HISTORICAL_ROOTS_LIMIT: usize,

@@ -60,7 +60,7 @@ use serde::{Deserialize, Serialize};
 use slog::{crit, debug, error, info, warn, Logger};
 use slot_clock::SlotClock;
 use ssz::Encode;
-use ssz_rs::{GeneralizedIndexable, HashTreeRoot, MerkleizationError, PathElement, Prove};
+use ssz_rs::{PathElement, Prove};
 pub use state_id::StateId;
 use std::future::Future;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -79,7 +79,7 @@ use tokio_stream::{
     StreamExt,
 };
 use types::beacon_state_summary::{
-    BeaconStateSummary, MainnetParams, MinimalParams, NetworkParams,
+    encode_node, BeaconStateSummary, MainnetParams, MinimalParams, NetworkParams,
 };
 use types::{
     fork_versioned_response::EmptyMetadata, Attestation, AttestationData, AttestationShufflingId,
@@ -2627,29 +2627,6 @@ pub fn serve<T: BeaconChainTypes>(
             },
         );
 
-    /**
-     *     let get_beacon_state_validators = beacon_states_path
-    .clone()
-    .and(warp::path("validators"))
-    .and(warp::path::end())
-    .and(multi_key_query::<api_types::ValidatorsQuery>())
-    .then(
-        |state_id: StateId,
-         task_spawner: TaskSpawner<T::EthSpec>,
-         chain: Arc<BeaconChain<T>>,
-         query_res: Result<api_types::ValidatorsQuery, warp::Rejection>| {
-            task_spawner.blocking_json_task(Priority::P1, move || {
-                let query = query_res?;
-                crate::validators::get_beacon_state_validators(
-                    state_id,
-                    chain,
-                    &query.id,
-                    &query.status,
-                )
-            })
-        },
-    );
-     */
     // GET debug/beacon/ssz/{state_id}/
     let get_ssz_proof = any_version
         .and(warp::path("debug"))
@@ -2698,9 +2675,21 @@ pub fn serve<T: BeaconChainTypes>(
                                 let (proof, witness) =
                                     state.as_deneb().unwrap().prove(&path).unwrap();
 
-                                
+                                let proof_and_witness = ProofAndWitness {
+                                    proof: ProofWrapper {
+                                        leaf: encode_node(&proof.leaf),
+                                        branch: proof
+                                            .branch
+                                            .iter()
+                                            .map(|n| encode_node(&n))
+                                            .collect(),
+                                        index: proof.index,
+                                    },
+                                    witness: *witness,
+                                };
+
                                 return Ok(add_consensus_version_header(
-                                    warp::reply::json(&witness).into_response(),
+                                    warp::reply::json(&proof_and_witness).into_response(),
                                     fork_name,
                                 ));
                             }
@@ -2711,11 +2700,23 @@ pub fn serve<T: BeaconChainTypes>(
                                     { MinimalParams::BYTES_PER_LOGS_BLOOM },
                                     { MinimalParams::MAX_EXTRA_DATA_BYTES },
                                 >::from(state_);
-                                let (_, witness) =
+                                let (proof, witness) =
                                     state.as_deneb().unwrap().prove(&path).unwrap();
 
+                                let proof_and_witness = ProofAndWitness {
+                                    proof: ProofWrapper {
+                                        leaf: encode_node(&proof.leaf),
+                                        branch: proof
+                                            .branch
+                                            .iter()
+                                            .map(|n| encode_node(&n))
+                                            .collect(),
+                                        index: proof.index,
+                                    },
+                                    witness: *witness,
+                                };
                                 return Ok(add_consensus_version_header(
-                                    warp::reply::json(&witness).into_response(),
+                                    warp::reply::json(&proof_and_witness).into_response(),
                                     fork_name,
                                 ));
                             }
@@ -2723,13 +2724,6 @@ pub fn serve<T: BeaconChainTypes>(
                                 todo!();
                             }
                         };
-
-                        // let (proof, witness) = state.as_deneb().unwrap().prove(path).unwrap();
-
-                        // Ok(add_consensus_version_header(
-                        //     warp::reply::json(&_execution_optimistic).into_response(),
-                        //     fork_name,
-                        // ))
                     }
                 })
             },
@@ -4571,8 +4565,7 @@ pub fn serve<T: BeaconChainTypes>(
                 .uor(get_debug_beacon_states)
                 .uor(get_debug_beacon_heads)
                 .uor(get_debug_fork_choice)
-                                .uor(get_ssz_proof)
-
+                .uor(get_ssz_proof)
                 .uor(get_node_identity)
                 .uor(get_node_version)
                 .uor(get_node_syncing)
@@ -4737,4 +4730,16 @@ fn publish_network_message<T: EthSpec>(
             e
         ))
     })
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ProofWrapper {
+    pub leaf: String,
+    pub branch: Vec<String>,
+    pub index: usize,
+}
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ProofAndWitness {
+    proof: ProofWrapper,
+    witness: [u8; 32],
 }
