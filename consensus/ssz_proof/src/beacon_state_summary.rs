@@ -1,39 +1,23 @@
-use crate::*;
 use derivative::Derivative;
-pub use eth_spec::*;
 use ethereum_consensus::{
     altair::Fork,
     bellatrix,
     capella::{self, HistoricalSummary},
-    deneb::{
-        self,
-        mainnet::{
-            BYTES_PER_LOGS_BLOOM as MAINNET_BYTES_PER_LOGS_BLOOM,
-            HISTORICAL_ROOTS_LIMIT as MAINNET_HISTORICAL_ROOTS_LIMIT,
-            MAX_EXTRA_DATA_BYTES as MAINNET_MAX_EXTRA_DATA_BYTES,
-            SLOTS_PER_HISTORICAL_ROOT as MAINNET_SLOTS_PER_HISTORICAL_ROOT,
-        },
-        minimal::{
-            BYTES_PER_LOGS_BLOOM as MINIMAL_BYTES_PER_LOGS_BLOOM,
-            HISTORICAL_ROOTS_LIMIT as MINIMAL_HISTORICAL_ROOTS_LIMIT,
-            MAX_EXTRA_DATA_BYTES as MINIMAL_MAX_EXTRA_DATA_BYTES,
-            SLOTS_PER_HISTORICAL_ROOT as MINIMAL_SLOTS_PER_HISTORICAL_ROOT,
-        },
-    },
+    deneb::{self},
     phase0::{beacon_block::BeaconBlockHeader, U256},
     primitives::{Root, Slot},
     ssz::prelude::{List, Vector},
 };
 use hex::encode;
 use metastruct::metastruct;
-pub use milhouse::interface::Interface;
 use ssz_rs::{
-    GeneralizedIndexable, HashTreeRoot, MerkleizationError, Node, PathElement,
-    Serialize as SszSerialize,
+    Deserialize, GeneralizedIndexable, HashTreeRoot, MerkleizationError, Node, PathElement,
+    Serialize,
 };
 use ssz_rs_derive::SimpleSerialize;
 use superstruct::superstruct;
 use tree_hash::TreeHash;
+use types::{historical_summary, BeaconState, Error, EthSpec, ExecutionPayloadHeader};
 
 pub fn encode_node(node: &Node) -> String {
     let mut buffer = Vec::new();
@@ -46,8 +30,6 @@ pub fn encode_node(node: &Node) -> String {
     variants(Base, Altair, Bellatrix, Capella, Deneb, Electra),
     variant_attributes(
         derive(Derivative, Debug, PartialEq, SimpleSerialize),
-        // serde(bound = "P: Params", deny_unknown_fields),
-        // arbitrary(bound = "P: Params"),
         derivative(Clone)
     ),
     specific_variant_attributes(
@@ -489,7 +471,7 @@ fn to_execution_payload_header_common_fields<
 
 fn convert_historical_summaries<T: EthSpec, const HISTORICAL_ROOTS_LIMIT: usize>(
     historical_summaries: milhouse::List<
-        crate::historical_summary::HistoricalSummary,
+        historical_summary::HistoricalSummary,
         T::HistoricalRootsLimit,
     >,
 ) -> List<HistoricalSummary, HISTORICAL_ROOTS_LIMIT> {
@@ -503,29 +485,6 @@ fn convert_historical_summaries<T: EthSpec, const HISTORICAL_ROOTS_LIMIT: usize>
             .collect::<Vec<HistoricalSummary>>(),
     )
     .unwrap()
-}
-
-pub trait NetworkParams {
-    const SLOTS_PER_HISTORICAL_ROOT: usize;
-    const HISTORICAL_ROOTS_LIMIT: usize;
-    const BYTES_PER_LOGS_BLOOM: usize;
-    const MAX_EXTRA_DATA_BYTES: usize;
-}
-
-pub struct MainnetParams;
-impl NetworkParams for MainnetParams {
-    const SLOTS_PER_HISTORICAL_ROOT: usize = MAINNET_SLOTS_PER_HISTORICAL_ROOT;
-    const HISTORICAL_ROOTS_LIMIT: usize = MAINNET_HISTORICAL_ROOTS_LIMIT;
-    const BYTES_PER_LOGS_BLOOM: usize = MAINNET_BYTES_PER_LOGS_BLOOM;
-    const MAX_EXTRA_DATA_BYTES: usize = MAINNET_MAX_EXTRA_DATA_BYTES;
-}
-
-pub struct MinimalParams;
-impl NetworkParams for MinimalParams {
-    const SLOTS_PER_HISTORICAL_ROOT: usize = MINIMAL_SLOTS_PER_HISTORICAL_ROOT;
-    const HISTORICAL_ROOTS_LIMIT: usize = MINIMAL_HISTORICAL_ROOTS_LIMIT;
-    const BYTES_PER_LOGS_BLOOM: usize = MINIMAL_BYTES_PER_LOGS_BLOOM;
-    const MAX_EXTRA_DATA_BYTES: usize = MINIMAL_MAX_EXTRA_DATA_BYTES;
 }
 
 impl<

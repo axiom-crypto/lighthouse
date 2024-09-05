@@ -60,7 +60,6 @@ use serde::{Deserialize, Serialize};
 use slog::{crit, debug, error, info, warn, Logger};
 use slot_clock::SlotClock;
 use ssz::Encode;
-use ssz_rs::{PathElement, Prove};
 pub use state_id::StateId;
 use std::future::Future;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -78,12 +77,11 @@ use tokio_stream::{
     wrappers::{errors::BroadcastStreamRecvError, BroadcastStream},
     StreamExt,
 };
-use types::beacon_state_summary::{
-    encode_node, BeaconStateSummary, MainnetParams, MinimalParams, NetworkParams,
-};
+
+use ssz_proof::ssz_prove;
 use types::{
     fork_versioned_response::EmptyMetadata, Attestation, AttestationData, AttestationShufflingId,
-    AttesterSlashing, BeaconStateError, CommitteeCache, ConfigAndPreset, Epoch, EthSpec, EthSpecId,
+    AttesterSlashing, BeaconStateError, CommitteeCache, ConfigAndPreset, Epoch, EthSpec,
     ForkName, ForkVersionedResponse, Hash256, ProposerPreparationData, ProposerSlashing,
     RelativeEpoch, SignedAggregateAndProof, SignedBlindedBeaconBlock, SignedBlsToExecutionChange,
     SignedContributionAndProof, SignedValidatorRegistrationData, SignedVoluntaryExit, Slot,
@@ -2661,69 +2659,11 @@ pub fn serve<T: BeaconChainTypes>(
 
                         let spec_id = T::EthSpec::spec_name();
 
-                        let path: Vec<PathElement> =
-                            path.into_iter().map(PathElement::Field).collect();
-
-                        match spec_id {
-                            EthSpecId::Mainnet => {
-                                let state = BeaconStateSummary::<
-                                    { MainnetParams::SLOTS_PER_HISTORICAL_ROOT },
-                                    { MainnetParams::HISTORICAL_ROOTS_LIMIT },
-                                    { MainnetParams::BYTES_PER_LOGS_BLOOM },
-                                    { MainnetParams::MAX_EXTRA_DATA_BYTES },
-                                >::from(state_);
-                                let (proof, witness) =
-                                    state.as_deneb().unwrap().prove(&path).unwrap();
-
-                                let proof_and_witness = ProofAndWitness {
-                                    proof: ProofWrapper {
-                                        leaf: encode_node(&proof.leaf),
-                                        branch: proof
-                                            .branch
-                                            .iter()
-                                            .map(|n| encode_node(&n))
-                                            .collect(),
-                                        index: proof.index,
-                                    },
-                                    witness: *witness,
-                                };
-
-                                return Ok(add_consensus_version_header(
-                                    warp::reply::json(&proof_and_witness).into_response(),
-                                    fork_name,
-                                ));
-                            }
-                            EthSpecId::Minimal => {
-                                let state = BeaconStateSummary::<
-                                    { MinimalParams::SLOTS_PER_HISTORICAL_ROOT },
-                                    { MinimalParams::HISTORICAL_ROOTS_LIMIT },
-                                    { MinimalParams::BYTES_PER_LOGS_BLOOM },
-                                    { MinimalParams::MAX_EXTRA_DATA_BYTES },
-                                >::from(state_);
-                                let (proof, witness) =
-                                    state.as_deneb().unwrap().prove(&path).unwrap();
-
-                                let proof_and_witness = ProofAndWitness {
-                                    proof: ProofWrapper {
-                                        leaf: encode_node(&proof.leaf),
-                                        branch: proof
-                                            .branch
-                                            .iter()
-                                            .map(|n| encode_node(&n))
-                                            .collect(),
-                                        index: proof.index,
-                                    },
-                                    witness: *witness,
-                                };
-                                return Ok(add_consensus_version_header(
-                                    warp::reply::json(&proof_and_witness).into_response(),
-                                    fork_name,
-                                ));
-                            }
-                            EthSpecId::Gnosis => {
-                                todo!();
-                            }
-                        };
+                        let proof_and_witness = ssz_prove(state_, spec_id, path);
+                        Ok(add_consensus_version_header(
+                            warp::reply::json(&proof_and_witness).into_response(),
+                            fork_name,
+                        ))
                     }
                 })
             },
@@ -4730,16 +4670,4 @@ fn publish_network_message<T: EthSpec>(
             e
         ))
     })
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ProofWrapper {
-    pub leaf: String,
-    pub branch: Vec<String>,
-    pub index: usize,
-}
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ProofAndWitness {
-    proof: ProofWrapper,
-    witness: [u8; 32],
 }

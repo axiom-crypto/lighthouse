@@ -4028,7 +4028,7 @@ dependencies = [
  "serde_json",
  "slog",
  "slot_clock",
- "ssz_rs",
+ "ssz_proof",
  "state_processing",
  "store",
  "sysinfo",
@@ -8405,6 +8405,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "ssz_proof"
+version = "0.2.0"
+dependencies = [
+ "arbitrary",
+ "derivative",
+ "ethereum-consensus",
+ "ethereum_serde_utils",
+ "hex",
+ "metastruct",
+ "milhouse",
+ "serde",
+ "serde_json",
+ "ssz_rs",
+ "ssz_rs_derive",
+ "ssz_types",
+ "superstruct",
+ "tree_hash",
+ "tree_hash_derive",
+ "types",
+]
+
+[[package]]
 name = "ssz_rs"
 version = "0.9.0"
 source = "git+https://github.com/ralexstokes/ssz-rs?rev=84ef2b71aa004f6767420badb42c902ad56b8b72#84ef2b71aa004f6767420badb42c902ad56b8b72"
@@ -9315,7 +9337,6 @@ dependencies = [
  "criterion",
  "derivative",
  "eth2_interop_keypairs",
- "ethereum-consensus",
  "ethereum-types 0.14.1",
  "ethereum_hashing",
  "ethereum_serde_utils",
@@ -9345,8 +9366,6 @@ dependencies = [
  "serde_yaml 0.9.32",
  "slog",
  "smallvec",
- "ssz_rs",
- "ssz_rs_derive",
  "ssz_types",
  "state_processing",
  "strum",

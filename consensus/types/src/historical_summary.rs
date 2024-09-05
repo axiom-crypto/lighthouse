@@ -32,8 +32,8 @@ use tree_hash_derive::TreeHash;
     arbitrary::Arbitrary,
 )]
 pub struct HistoricalSummary {
-    pub(crate) block_summary_root: Hash256,
-    pub(crate) state_summary_root: Hash256,
+    pub block_summary_root: Hash256,
+    pub state_summary_root: Hash256,
 }
 
 impl HistoricalSummary {

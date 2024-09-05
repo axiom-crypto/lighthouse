@@ -56,6 +56,7 @@ members = [
     "consensus/fork_choice",
     "consensus/proto_array",
     "consensus/safe_arith",
+    "consensus/ssz_proof",
     "consensus/state_processing",
     "consensus/swap_or_not_shuffle",
 
@@ -232,6 +233,7 @@ store = { path = "beacon_node/store" }
 swap_or_not_shuffle = { path = "consensus/swap_or_not_shuffle" }
 task_executor = { path = "common/task_executor" }
 types = { path = "consensus/types" }
+ssz_proof = { path = "consensus/ssz_proof" }
 unused_port = { path = "common/unused_port" }
 validator_client = { path = "validator_client" }
 validator_dir = { path = "common/validator_dir" }
