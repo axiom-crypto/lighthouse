@@ -158,6 +158,8 @@ use tree_hash::TreeHash;
 pub struct BeaconStateSummary<
     const SLOTS_PER_HISTORICAL_ROOT: usize,
     const HISTORICAL_ROOTS_LIMIT: usize,
+    const BYTES_PER_LOGS_BLOOM: usize,
+    const MAX_EXTRA_DATA_BYTES: usize,
 > {
     // Versioning
     #[superstruct(getter(copy))]
@@ -258,24 +260,22 @@ pub struct BeaconStateSummary<
         partial_getter(rename = "latest_execution_payload_header_bellatrix")
     )]
     #[metastruct(exclude_from(tree_lists))]
-    pub latest_execution_payload_header: bellatrix::ExecutionPayloadHeader<
-        MAINNET_BYTES_PER_LOGS_BLOOM,
-        MAINNET_MAX_EXTRA_DATA_BYTES,
-    >,
+    pub latest_execution_payload_header:
+        bellatrix::ExecutionPayloadHeader<BYTES_PER_LOGS_BLOOM, MAX_EXTRA_DATA_BYTES>,
     #[superstruct(
         only(Capella),
         partial_getter(rename = "latest_execution_payload_header_capella")
     )]
     #[metastruct(exclude_from(tree_lists))]
     pub latest_execution_payload_header:
-        capella::ExecutionPayloadHeader<MAINNET_BYTES_PER_LOGS_BLOOM, MAINNET_MAX_EXTRA_DATA_BYTES>,
+        capella::ExecutionPayloadHeader<BYTES_PER_LOGS_BLOOM, MAX_EXTRA_DATA_BYTES>,
     #[superstruct(
         only(Deneb),
         partial_getter(rename = "latest_execution_payload_header_deneb")
     )]
     #[metastruct(exclude_from(tree_lists))]
     pub latest_execution_payload_header:
-        deneb::ExecutionPayloadHeader<MAINNET_BYTES_PER_LOGS_BLOOM, MAINNET_MAX_EXTRA_DATA_BYTES>,
+        deneb::ExecutionPayloadHeader<BYTES_PER_LOGS_BLOOM, MAX_EXTRA_DATA_BYTES>,
     // #[superstruct(
     //     only(Electra),
     //     partial_getter(rename = "latest_execution_payload_header_electra")
@@ -326,6 +326,40 @@ pub struct BeaconStateSummary<
     // #[test_random(default)]
     // #[superstruct(only(Electra))]
     // pub pending_consolidations: List<PendingConsolidation, E::PendingConsolidationsLimit>,
+}
+
+/// This is the list of common fields for BeaconStateSummary
+pub struct BeaconStateSummaryCommonFields<
+    const SLOTS_PER_HISTORICAL_ROOT: usize,
+    const HISTORICAL_ROOTS_LIMIT: usize,
+> {
+    pub genesis_time: u64,
+    pub genesis_validators_root: Root,
+    pub slot: Slot,
+    pub fork: Fork,
+
+    // History
+    pub latest_block_header: BeaconBlockHeader,
+    pub block_roots: Root,
+    pub state_roots: Vector<Root, SLOTS_PER_HISTORICAL_ROOT>,
+    // Frozen in Capella, replaced by historical_summaries
+    pub historical_roots: List<Root, HISTORICAL_ROOTS_LIMIT>,
+
+    pub eth1_data: Root,
+    pub eth1_data_votes: Root,
+    pub eth1_deposit_index: u64,
+
+    pub validators: Root,
+    pub balances: Root,
+
+    // Randomness
+    pub randao_mixes: Root,
+    pub slashings: Root,
+
+    pub justification_bits: Root,
+    pub previous_justified_checkpoint: Root,
+    pub current_justified_checkpoint: Root,
+    pub finalized_checkpoint: Root,
 }
 
 fn to_beacon_state_summary_common_fields<
@@ -417,40 +451,48 @@ where
     }
 }
 
-/// This is the list of common fields for BeaconStateSummary
-pub struct BeaconStateSummaryCommonFields<
-    const SLOTS_PER_HISTORICAL_ROOT: usize,
-    const HISTORICAL_ROOTS_LIMIT: usize,
-> {
-    pub genesis_time: u64,
-    pub genesis_validators_root: Root,
-    pub slot: Slot,
-    pub fork: Fork,
-
-    // History
-    pub latest_block_header: BeaconBlockHeader,
-    pub block_roots: Root,
-    pub state_roots: Vector<Root, SLOTS_PER_HISTORICAL_ROOT>,
-    // Frozen in Capella, replaced by historical_summaries
-    pub historical_roots: List<Root, HISTORICAL_ROOTS_LIMIT>,
-
-    pub eth1_data: Root,
-    pub eth1_data_votes: Root,
-    pub eth1_deposit_index: u64,
-
-    pub validators: Root,
-    pub balances: Root,
-
-    // Randomness
-    pub randao_mixes: Root,
-    pub slashings: Root,
-
-    pub justification_bits: Root,
-    pub previous_justified_checkpoint: Root,
-    pub current_justified_checkpoint: Root,
-    pub finalized_checkpoint: Root,
+fn to_execution_payload_header_common_fields<
+    E: EthSpec,
+    const BYTES_PER_LOGS_BLOOM: usize,
+    const MAX_EXTRA_DATA_BYTES: usize,
+>(
+    header: &ExecutionPayloadHeader<E>,
+) -> bellatrix::ExecutionPayloadHeader<BYTES_PER_LOGS_BLOOM, MAX_EXTRA_DATA_BYTES> {
+    bellatrix::ExecutionPayloadHeader {
+        parent_hash: header.parent_hash().0 .0.as_slice().try_into().unwrap(),
+        fee_recipient: header.fee_recipient().0.as_slice().try_into().unwrap(),
+        state_root: header.state_root().0.as_slice().try_into().unwrap(),
+        receipts_root: header.receipts_root().0.as_slice().try_into().unwrap(),
+        logs_bloom: header.logs_bloom().as_ref().try_into().unwrap(),
+        prev_randao: header.prev_randao().0.as_slice().try_into().unwrap(),
+        block_number: header.block_number(),
+        gas_limit: header.gas_limit(),
+        gas_used: header.gas_used(),
+        timestamp: header.timestamp(),
+        extra_data: header.extra_data().as_ref().try_into().unwrap(),
+        base_fee_per_gas: U256::from_limbs(header.base_fee_per_gas().0),
+        block_hash: header.block_hash().0 .0.as_slice().try_into().unwrap(),
+        transactions_root: header.transactions_root().0.as_slice().try_into().unwrap(),
+    }
 }
 
+fn convert_historical_summaries<T: EthSpec, const HISTORICAL_ROOTS_LIMIT: usize>(
+    historical_summaries: milhouse::List<
+        crate::historical_summary::HistoricalSummary,
+        T::HistoricalRootsLimit,
+    >,
+) -> List<HistoricalSummary, HISTORICAL_ROOTS_LIMIT> {
+    List::try_from(
+        historical_summaries
+            .into_iter()
+            .map(|x| HistoricalSummary {
+                block_summary_root: x.block_summary_root.0.into(),
+                state_summary_root: x.state_summary_root.0.into(),
+            })
+            .collect::<Vec<HistoricalSummary>>(),
+    )
+    .unwrap()
+}
 pub trait NetworkParams {
     const SLOTS_PER_HISTORICAL_ROOT: usize;
     const HISTORICAL_ROOTS_LIMIT: usize;
@@ -468,14 +510,25 @@ impl NetworkParams for MainnetParams {
 
 pub struct MinimalParams;
 impl NetworkParams for MinimalParams {
-    const SLOTS_PER_HISTORICAL_ROOT: usize = MAINNET_SLOTS_PER_HISTORICAL_ROOT;
-    const HISTORICAL_ROOTS_LIMIT: usize = MAINNET_HISTORICAL_ROOTS_LIMIT;
-    const BYTES_PER_LOGS_BLOOM: usize = MAINNET_BYTES_PER_LOGS_BLOOM;
-    const MAX_EXTRA_DATA_BYTES: usize = MAINNET_MAX_EXTRA_DATA_BYTES;
+    const SLOTS_PER_HISTORICAL_ROOT: usize = MINIMAL_SLOTS_PER_HISTORICAL_ROOT;
+    const HISTORICAL_ROOTS_LIMIT: usize = MINIMAL_HISTORICAL_ROOTS_LIMIT;
+    const BYTES_PER_LOGS_BLOOM: usize = MINIMAL_BYTES_PER_LOGS_BLOOM;
+    const MAX_EXTRA_DATA_BYTES: usize = MINIMAL_MAX_EXTRA_DATA_BYTES;
 }
 
-impl<E: EthSpec, const SLOTS_PER_HISTORICAL_ROOT: usize, const HISTORICAL_ROOTS_LIMIT: usize>
-    From<BeaconState<E>> for BeaconStateSummary<SLOTS_PER_HISTORICAL_ROOT, HISTORICAL_ROOTS_LIMIT>
+impl<
+        E: EthSpec,
+        const SLOTS_PER_HISTORICAL_ROOT: usize,
+        const HISTORICAL_ROOTS_LIMIT: usize,
+        const BYTES_PER_LOGS_BLOOM: usize,
+        const MAX_EXTRA_DATA_BYTES: usize,
+    > From<BeaconState<E>>
+    for BeaconStateSummary<
+        SLOTS_PER_HISTORICAL_ROOT,
+        HISTORICAL_ROOTS_LIMIT,
+        BYTES_PER_LOGS_BLOOM,
+        MAX_EXTRA_DATA_BYTES,
+    >
 {
     fn from(state: BeaconState<E>) -> Self {
         let BeaconStateSummaryCommonFields {
@@ -567,6 +620,10 @@ impl<E: EthSpec, const SLOTS_PER_HISTORICAL_ROOT: usize, const HISTORICAL_ROOTS_
                 inactivity_scores: state.inactivity_scores.tree_hash_root().0.into(),
             }),
             BeaconState::Merge(state) => {
+                let latest_execution_payload_header =
+                    ExecutionPayloadHeader::Merge(state.latest_execution_payload_header);
+                let latest_execution_payload_header =
+                    to_execution_payload_header_common_fields(&latest_execution_payload_header);
                 BeaconStateSummary::Bellatrix(BeaconStateSummaryBellatrix {
                     genesis_time,
                     genesis_validators_root,
@@ -600,335 +657,181 @@ impl<E: EthSpec, const SLOTS_PER_HISTORICAL_ROOT: usize, const HISTORICAL_ROOTS_
                     current_sync_committee: state.current_sync_committee.tree_hash_root().0.into(),
                     next_sync_committee: state.next_sync_committee.tree_hash_root().0.into(),
                     inactivity_scores: state.inactivity_scores.tree_hash_root().0.into(),
-                    latest_execution_payload_header: bellatrix::ExecutionPayloadHeader {
-                        parent_hash: state
-                            .latest_execution_payload_header
-                            .parent_hash
-                            .0
-                             .0
-                            .as_slice()
-                            .try_into()
-                            .unwrap(),
-                        fee_recipient: state
-                            .latest_execution_payload_header
-                            .fee_recipient
-                            .0
-                            .as_slice()
-                            .try_into()
-                            .unwrap(),
-                        state_root: state
-                            .latest_execution_payload_header
-                            .state_root
-                            .0
-                            .as_slice()
-                            .try_into()
-                            .unwrap(),
-                        receipts_root: state
-                            .latest_execution_payload_header
-                            .receipts_root
-                            .0
-                            .as_slice()
-                            .try_into()
-                            .unwrap(),
-                        logs_bloom: state
-                            .latest_execution_payload_header
-                            .logs_bloom
-                            .as_ref()
-                            .try_into()
-                            .unwrap(),
-                        prev_randao: state
-                            .latest_execution_payload_header
-                            .prev_randao
-                            .0
-                            .as_slice()
-                            .try_into()
-                            .unwrap(),
-                        block_number: state.latest_execution_payload_header.block_number,
-                        gas_limit: state.latest_execution_payload_header.gas_limit,
-                        gas_used: state.latest_execution_payload_header.gas_used,
-                        timestamp: state.latest_execution_payload_header.timestamp,
-                        extra_data: state
-                            .latest_execution_payload_header
-                            .extra_data
-                            .as_ref()
-                            .try_into()
-                            .unwrap(),
-                        base_fee_per_gas: U256::from_limbs(
-                            state.latest_execution_payload_header.base_fee_per_gas.0,
-                        ),
-                        block_hash: state
-                            .latest_execution_payload_header
-                            .block_hash
-                            .0
-                             .0
-                            .as_slice()
-                            .try_into()
-                            .unwrap(),
-                        transactions_root: state
-                            .latest_execution_payload_header
-                            .transactions_root
-                            .0
-                            .as_slice()
-                            .try_into()
-                            .unwrap(),
-                    },
+                    latest_execution_payload_header,
                 })
             }
-            BeaconState::Capella(state) => BeaconStateSummary::Capella(BeaconStateSummaryCapella {
-                genesis_time,
-                genesis_validators_root,
-                slot,
-                fork,
-                latest_block_header,
-                block_roots,
-                state_roots,
-                historical_roots,
-                eth1_data,
-                eth1_data_votes,
-                eth1_deposit_index,
-                validators,
-                balances,
-                randao_mixes,
-                slashings,
-                justification_bits,
-                previous_justified_checkpoint,
-                current_justified_checkpoint,
-                finalized_checkpoint,
-                current_epoch_participation: state
-                    .current_epoch_participation
-                    .tree_hash_root()
+            BeaconState::Capella(state) => {
+                let withdrawals_root: Root = state
+                    .latest_execution_payload_header
+                    .withdrawals_root
                     .0
-                    .into(),
-                previous_epoch_participation: state
-                    .previous_epoch_participation
-                    .tree_hash_root()
-                    .0
-                    .into(),
-                current_sync_committee: state.current_sync_committee.tree_hash_root().0.into(),
-                next_sync_committee: state.next_sync_committee.tree_hash_root().0.into(),
-                inactivity_scores: state.inactivity_scores.tree_hash_root().0.into(),
-                latest_execution_payload_header: capella::ExecutionPayloadHeader {
-                    parent_hash: state
-                        .latest_execution_payload_header
-                        .parent_hash
+                    .as_slice()
+                    .try_into()
+                    .unwrap();
+                let latest_execution_payload_header =
+                    ExecutionPayloadHeader::Capella(state.latest_execution_payload_header);
+                let bellatrix::ExecutionPayloadHeader {
+                    parent_hash,
+                    fee_recipient,
+                    state_root,
+                    receipts_root,
+                    logs_bloom,
+                    prev_randao,
+                    block_hash,
+                    block_number,
+                    gas_limit,
+                    gas_used,
+                    timestamp,
+                    extra_data,
+                    base_fee_per_gas,
+                    transactions_root,
+                } = to_execution_payload_header_common_fields(&latest_execution_payload_header);
+
+                BeaconStateSummary::Capella(BeaconStateSummaryCapella {
+                    genesis_time,
+                    genesis_validators_root,
+                    slot,
+                    fork,
+                    latest_block_header,
+                    block_roots,
+                    state_roots,
+                    historical_roots,
+                    eth1_data,
+                    eth1_data_votes,
+                    eth1_deposit_index,
+                    validators,
+                    balances,
+                    randao_mixes,
+                    slashings,
+                    justification_bits,
+                    previous_justified_checkpoint,
+                    current_justified_checkpoint,
+                    finalized_checkpoint,
+                    current_epoch_participation: state
+                        .current_epoch_participation
+                        .tree_hash_root()
                         .0
-                         .0
-                        .as_slice()
-                        .try_into()
-                        .unwrap(),
-                    fee_recipient: state
-                        .latest_execution_payload_header
-                        .fee_recipient
+                        .into(),
+                    previous_epoch_participation: state
+                        .previous_epoch_participation
+                        .tree_hash_root()
                         .0
-                        .as_slice()
-                        .try_into()
-                        .unwrap(),
-                    state_root: state
-                        .latest_execution_payload_header
-                        .state_root
-                        .0
-                        .as_slice()
-                        .try_into()
-                        .unwrap(),
-                    receipts_root: state
-                        .latest_execution_payload_header
-                        .receipts_root
-                        .0
-                        .as_slice()
-                        .try_into()
-                        .unwrap(),
-                    logs_bloom: state
-                        .latest_execution_payload_header
-                        .logs_bloom
-                        .as_ref()
-                        .try_into()
-                        .unwrap(),
-                    prev_randao: state
-                        .latest_execution_payload_header
-                        .prev_randao
-                        .0
-                        .as_slice()
-                        .try_into()
-                        .unwrap(),
-                    block_number: state.latest_execution_payload_header.block_number,
-                    gas_limit: state.latest_execution_payload_header.gas_limit,
-                    gas_used: state.latest_execution_payload_header.gas_used,
-                    timestamp: state.latest_execution_payload_header.timestamp,
-                    extra_data: state
-                        .latest_execution_payload_header
-                        .extra_data
-                        .as_ref()
-                        .try_into()
-                        .unwrap(),
-                    base_fee_per_gas: U256::from_limbs(
-                        state.latest_execution_payload_header.base_fee_per_gas.0,
+                        .into(),
+                    current_sync_committee: state.current_sync_committee.tree_hash_root().0.into(),
+                    next_sync_committee: state.next_sync_committee.tree_hash_root().0.into(),
+                    inactivity_scores: state.inactivity_scores.tree_hash_root().0.into(),
+                    latest_execution_payload_header: capella::ExecutionPayloadHeader {
+                        parent_hash,
+                        fee_recipient,
+                        state_root,
+                        receipts_root,
+                        logs_bloom,
+                        prev_randao,
+                        block_hash,
+                        block_number,
+                        gas_limit,
+                        gas_used,
+                        timestamp,
+                        extra_data,
+                        base_fee_per_gas,
+                        transactions_root,
+                        withdrawals_root,
+                    },
+                    next_withdrawal_index: state.next_withdrawal_index,
+                    next_withdrawal_validator_index: state.next_withdrawal_validator_index,
+                    historical_summaries: convert_historical_summaries::<E, HISTORICAL_ROOTS_LIMIT>(
+                        state.historical_summaries,
                     ),
-                    block_hash: state
-                        .latest_execution_payload_header
-                        .block_hash
-                        .0
-                         .0
-                        .as_slice()
-                        .try_into()
-                        .unwrap(),
-                    transactions_root: state
-                        .latest_execution_payload_header
-                        .transactions_root
-                        .0
-                        .as_slice()
-                        .try_into()
-                        .unwrap(),
-                    withdrawals_root: state
-                        .latest_execution_payload_header
-                        .withdrawals_root
-                        .0
-                        .as_slice()
-                        .try_into()
-                        .unwrap(),
-                },
-                next_withdrawal_index: state.next_withdrawal_index,
-                next_withdrawal_validator_index: state.next_withdrawal_validator_index,
-                historical_summaries: List::try_from(
-                    state
-                        .historical_summaries
-                        .into_iter()
-                        .map(|x| HistoricalSummary {
-                            block_summary_root: x.block_summary_root.0.into(),
-                            state_summary_root: x.state_summary_root.0.into(),
-                        })
-                        .collect::<Vec<HistoricalSummary>>(),
-                )
-                .unwrap(),
-            }),
-            BeaconState::Deneb(state) => BeaconStateSummary::Deneb(BeaconStateSummaryDeneb {
-                genesis_time,
-                genesis_validators_root,
-                slot,
-                fork,
-                latest_block_header,
-                block_roots,
-                state_roots,
-                historical_roots,
-                eth1_data,
-                eth1_data_votes,
-                eth1_deposit_index,
-                validators,
-                balances,
-                randao_mixes,
-                slashings,
-                justification_bits,
-                previous_justified_checkpoint,
-                current_justified_checkpoint,
-                finalized_checkpoint,
-                current_epoch_participation: state
-                    .current_epoch_participation
-                    .tree_hash_root()
+                })
+            }
+            BeaconState::Deneb(state) => {
+                let withdrawals_root: Root = state
+                    .latest_execution_payload_header
+                    .withdrawals_root
                     .0
-                    .into(),
-                previous_epoch_participation: state
-                    .previous_epoch_participation
-                    .tree_hash_root()
-                    .0
-                    .into(),
-                current_sync_committee: state.current_sync_committee.tree_hash_root().0.into(),
-                next_sync_committee: state.next_sync_committee.tree_hash_root().0.into(),
-                inactivity_scores: state.inactivity_scores.tree_hash_root().0.into(),
-                latest_execution_payload_header: deneb::ExecutionPayloadHeader {
-                    parent_hash: state
-                        .latest_execution_payload_header
-                        .parent_hash
+                    .as_slice()
+                    .try_into()
+                    .unwrap();
+                let blob_gas_used = state.latest_execution_payload_header.blob_gas_used;
+                let excess_blob_gas = state.latest_execution_payload_header.excess_blob_gas;
+                let latest_execution_payload_header =
+                    ExecutionPayloadHeader::Deneb(state.latest_execution_payload_header);
+                let bellatrix::ExecutionPayloadHeader {
+                    parent_hash,
+                    fee_recipient,
+                    state_root,
+                    receipts_root,
+                    logs_bloom,
+                    prev_randao,
+                    block_hash,
+                    block_number,
+                    gas_limit,
+                    gas_used,
+                    timestamp,
+                    extra_data,
+                    base_fee_per_gas,
+                    transactions_root,
+                } = to_execution_payload_header_common_fields(&latest_execution_payload_header);
+
+                BeaconStateSummary::Deneb(BeaconStateSummaryDeneb {
+                    genesis_time,
+                    genesis_validators_root,
+                    slot,
+                    fork,
+                    latest_block_header,
+                    block_roots,
+                    state_roots,
+                    historical_roots,
+                    eth1_data,
+                    eth1_data_votes,
+                    eth1_deposit_index,
+                    validators,
+                    balances,
+                    randao_mixes,
+                    slashings,
+                    justification_bits,
+                    previous_justified_checkpoint,
+                    current_justified_checkpoint,
+                    finalized_checkpoint,
+                    current_epoch_participation: state
+                        .current_epoch_participation
+                        .tree_hash_root()
                         .0
-                         .0
-                        .as_slice()
-                        .try_into()
-                        .unwrap(),
-                    fee_recipient: state
-                        .latest_execution_payload_header
-                        .fee_recipient
+                        .into(),
+                    previous_epoch_participation: state
+                        .previous_epoch_participation
+                        .tree_hash_root()
                         .0
-                        .as_slice()
-                        .try_into()
-                        .unwrap(),
-                    state_root: state
-                        .latest_execution_payload_header
-                        .state_root
-                        .0
-                        .as_slice()
-                        .try_into()
-                        .unwrap(),
-                    receipts_root: state
-                        .latest_execution_payload_header
-                        .receipts_root
-                        .0
-                        .as_slice()
-                        .try_into()
-                        .unwrap(),
-                    logs_bloom: state
-                        .latest_execution_payload_header
-                        .logs_bloom
-                        .as_ref()
-                        .try_into()
-                        .unwrap(),
-                    prev_randao: state
-                        .latest_execution_payload_header
-                        .prev_randao
-                        .0
-                        .as_slice()
-                        .try_into()
-                        .unwrap(),
-                    block_number: state.latest_execution_payload_header.block_number,
-                    gas_limit: state.latest_execution_payload_header.gas_limit,
-                    gas_used: state.latest_execution_payload_header.gas_used,
-                    timestamp: state.latest_execution_payload_header.timestamp,
-                    extra_data: state
-                        .latest_execution_payload_header
-                        .extra_data
-                        .as_ref()
-                        .try_into()
-                        .unwrap(),
-                    base_fee_per_gas: U256::from_limbs(
-                        state.latest_execution_payload_header.base_fee_per_gas.0,
+                        .into(),
+                    current_sync_committee: state.current_sync_committee.tree_hash_root().0.into(),
+                    next_sync_committee: state.next_sync_committee.tree_hash_root().0.into(),
+                    inactivity_scores: state.inactivity_scores.tree_hash_root().0.into(),
+                    latest_execution_payload_header: deneb::ExecutionPayloadHeader {
+                        parent_hash,
+                        fee_recipient,
+                        state_root,
+                        receipts_root,
+                        logs_bloom,
+                        prev_randao,
+                        block_hash,
+                        block_number,
+                        gas_limit,
+                        gas_used,
+                        timestamp,
+                        extra_data,
+                        base_fee_per_gas,
+                        transactions_root,
+                        withdrawals_root,
+                        blob_gas_used,
+                        excess_blob_gas,
+                    },
+                    next_withdrawal_index: state.next_withdrawal_index,
+                    next_withdrawal_validator_index: state.next_withdrawal_validator_index,
+                    historical_summaries: convert_historical_summaries::<E, HISTORICAL_ROOTS_LIMIT>(
+                        state.historical_summaries,
                     ),
-                    block_hash: state
-                        .latest_execution_payload_header
-                        .block_hash
-                        .0
-                         .0
-                        .as_slice()
-                        .try_into()
-                        .unwrap(),
-                    transactions_root: state
-                        .latest_execution_payload_header
-                        .transactions_root
-                        .0
-                        .as_slice()
-                        .try_into()
-                        .unwrap(),
-                    withdrawals_root: state
-                        .latest_execution_payload_header
-                        .withdrawals_root
-                        .0
-                        .as_slice()
-                        .try_into()
-                        .unwrap(),
-                    blob_gas_used: state.latest_execution_payload_header.blob_gas_used,
-                    excess_blob_gas: state.latest_execution_payload_header.excess_blob_gas,
-                },
-                next_withdrawal_index: state.next_withdrawal_index,
-                next_withdrawal_validator_index: state.next_withdrawal_validator_index,
-                historical_summaries: List::try_from(
-                    state
-                        .historical_summaries
-                        .into_iter()
-                        .map(|x| HistoricalSummary {
-                            block_summary_root: x.block_summary_root.0.into(),
-                            state_summary_root: x.state_summary_root.0.into(),
-                        })
-                        .collect::<Vec<HistoricalSummary>>(),
-                )
-                .unwrap(),
-            }),
-            // BeaconState::Electra(state) => todo!(),
+                })
+            } // BeaconState::Electra(state) => todo!(),
         }
     }
 }
