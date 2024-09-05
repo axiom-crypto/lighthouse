@@ -20,6 +20,8 @@ pub trait NetworkParams {
     const MAX_EXTRA_DATA_BYTES: usize;
 }
 
+/// These parameters have not been changed in hardforks so far, so we only have different
+/// params based on Mainnet/Minimal.
 pub struct MainnetParams;
 impl NetworkParams for MainnetParams {
     const SLOTS_PER_HISTORICAL_ROOT: usize = MAINNET_SLOTS_PER_HISTORICAL_ROOT;

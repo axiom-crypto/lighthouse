@@ -146,6 +146,7 @@ pub fn encode_node(node: &Node) -> String {
     partial_getter_error(ty = "Error", expr = "Error::IncorrectStateVariant"),
     map_ref_mut_into(BeaconStateRef)
 )]
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct BeaconStateSummary<
     const SLOTS_PER_HISTORICAL_ROOT: usize,
@@ -320,8 +321,8 @@ pub struct BeaconStateSummary<
     // pub pending_consolidations: List<PendingConsolidation, E::PendingConsolidationsLimit>,
 }
 
-/// This is the list of common fields for BeaconStateSummary
-
+/// This is the list of common fields for BeaconStateSummary. Unfortunately there is no base struct
+/// that only contain these fields.
 pub struct BeaconStateSummaryCommonFields<
     const SLOTS_PER_HISTORICAL_ROOT: usize,
     const HISTORICAL_ROOTS_LIMIT: usize,
@@ -443,6 +444,7 @@ where
         finalized_checkpoint,
     }
 }
+
 
 fn to_execution_payload_header_common_fields<
     E: EthSpec,
