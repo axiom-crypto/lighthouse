@@ -81,9 +81,9 @@ use tokio_stream::{
 use ssz_proof::ssz_prove;
 use types::{
     fork_versioned_response::EmptyMetadata, Attestation, AttestationData, AttestationShufflingId,
-    AttesterSlashing, BeaconStateError, CommitteeCache, ConfigAndPreset, Epoch, EthSpec,
-    ForkName, ForkVersionedResponse, Hash256, ProposerPreparationData, ProposerSlashing,
-    RelativeEpoch, SignedAggregateAndProof, SignedBlindedBeaconBlock, SignedBlsToExecutionChange,
+    AttesterSlashing, BeaconStateError, CommitteeCache, ConfigAndPreset, Epoch, EthSpec, ForkName,
+    ForkVersionedResponse, Hash256, ProposerPreparationData, ProposerSlashing, RelativeEpoch,
+    SignedAggregateAndProof, SignedBlindedBeaconBlock, SignedBlsToExecutionChange,
     SignedContributionAndProof, SignedValidatorRegistrationData, SignedVoluntaryExit, Slot,
     SyncCommitteeMessage, SyncContributionData,
 };
@@ -2647,24 +2647,29 @@ pub fn serve<T: BeaconChainTypes>(
              task_spawner: TaskSpawner<T::EthSpec>,
              chain: Arc<BeaconChain<T>>,
              query_res: Result<api_types::SszQuery, warp::Rejection>| {
-                task_spawner.blocking_response_task(Priority::P1, move || match accept_header {
-                    Some(api_types::Accept::Ssz) => panic!("JSON Only"),
-                    _ => {
-                        let query = query_res?;
-                        let path = query.path;
-                        let (state_, _execution_optimistic, _finalized) = state_id.state(&chain)?;
-                        let fork_name = state_
-                            .fork_name(&chain.spec)
-                            .map_err(inconsistent_fork_rejection)?;
+                task_spawner.blocking_response_task(Priority::P1, move || {
+                    let query = query_res?;
+                    let path = query.path;
+                    let (mut state_, _execution_optimistic, _finalized) = state_id.state(&chain)?;
 
-                        let spec_id = T::EthSpec::spec_name();
+                    // Apply pending mutations to make sure we can generate tree_root_hash for slots which are not in LRU cache (e.g. historical slots)
+                    state_.apply_pending_mutations().map_err(|_| {
+                        warp_utils::reject::custom_server_error(
+                            "Failed to apply pending mutations".to_owned(),
+                        )
+                    })?;
+                    let fork_name = state_
+                        .fork_name(&chain.spec)
+                        .map_err(inconsistent_fork_rejection)?;
 
-                        let proof_and_witness = ssz_prove(state_, spec_id, path);
-                        Ok(add_consensus_version_header(
-                            warp::reply::json(&proof_and_witness).into_response(),
-                            fork_name,
-                        ))
-                    }
+                    let spec_id = T::EthSpec::spec_name();
+
+                    let proof_and_witness = ssz_prove(state_, spec_id, path);
+
+                    Ok(add_consensus_version_header(
+                        warp::reply::json(&proof_and_witness).into_response(),
+                        fork_name,
+                    ))
                 })
             },
         );

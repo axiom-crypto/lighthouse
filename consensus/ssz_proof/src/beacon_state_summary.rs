@@ -146,7 +146,6 @@ pub fn encode_node(node: &Node) -> String {
     partial_getter_error(ty = "Error", expr = "Error::IncorrectStateVariant"),
     map_ref_mut_into(BeaconStateRef)
 )]
-
 #[derive(Debug, PartialEq, Clone)]
 pub struct BeaconStateSummary<
     const SLOTS_PER_HISTORICAL_ROOT: usize,
@@ -444,7 +443,6 @@ where
         finalized_checkpoint,
     }
 }
-
 
 fn to_execution_payload_header_common_fields<
     E: EthSpec,
