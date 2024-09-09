@@ -77,6 +77,8 @@ use tokio_stream::{
     wrappers::{errors::BroadcastStreamRecvError, BroadcastStream},
     StreamExt,
 };
+
+use ssz_proof::ssz_prove;
 use types::{
     fork_versioned_response::EmptyMetadata, Attestation, AttestationData, AttestationShufflingId,
     AttesterSlashing, BeaconStateError, CommitteeCache, ConfigAndPreset, Epoch, EthSpec, ForkName,
@@ -2623,6 +2625,55 @@ pub fn serve<T: BeaconChainTypes>(
             },
         );
 
+    // GET debug/beacon/ssz/{state_id}/
+    let get_ssz_proof = any_version
+        .and(warp::path("debug"))
+        .and(warp::path("beacon"))
+        .and(warp::path("ssz"))
+        .and(warp::path::param::<StateId>().or_else(|_| async {
+            Err(warp_utils::reject::custom_bad_request(
+                "Invalid state ID".to_string(),
+            ))
+        }))
+        .and(warp::path::end())
+        .and(warp::header::optional::<api_types::Accept>("accept"))
+        .and(task_spawner_filter.clone())
+        .and(chain_filter.clone())
+        .and(multi_key_query::<api_types::SszQuery>())
+        .then(
+            |endpoint_version: EndpointVersion,
+             state_id: StateId,
+             accept_header: Option<api_types::Accept>,
+             task_spawner: TaskSpawner<T::EthSpec>,
+             chain: Arc<BeaconChain<T>>,
+             query_res: Result<api_types::SszQuery, warp::Rejection>| {
+                task_spawner.blocking_response_task(Priority::P1, move || {
+                    let query = query_res?;
+                    let path = query.path;
+                    let (mut state_, _execution_optimistic, _finalized) = state_id.state(&chain)?;
+
+                    // Apply pending mutations to make sure we can generate tree_root_hash for slots which are not in LRU cache (e.g. historical slots)
+                    state_.apply_pending_mutations().map_err(|_| {
+                        warp_utils::reject::custom_server_error(
+                            "Failed to apply pending mutations".to_owned(),
+                        )
+                    })?;
+                    let fork_name = state_
+                        .fork_name(&chain.spec)
+                        .map_err(inconsistent_fork_rejection)?;
+
+                    let spec_id = T::EthSpec::spec_name();
+
+                    let proof_and_witness = ssz_prove(state_, spec_id, path);
+
+                    Ok(add_consensus_version_header(
+                        warp::reply::json(&proof_and_witness).into_response(),
+                        fork_name,
+                    ))
+                })
+            },
+        );
+
     // GET debug/beacon/heads
     let get_debug_beacon_heads = any_version
         .and(warp::path("debug"))
@@ -4459,6 +4510,7 @@ pub fn serve<T: BeaconChainTypes>(
                 .uor(get_debug_beacon_states)
                 .uor(get_debug_beacon_heads)
                 .uor(get_debug_fork_choice)
+                .uor(get_ssz_proof)
                 .uor(get_node_identity)
                 .uor(get_node_version)
                 .uor(get_node_syncing)
