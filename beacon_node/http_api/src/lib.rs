@@ -2650,6 +2650,7 @@ pub fn serve<T: BeaconChainTypes>(
                 task_spawner.blocking_response_task(Priority::P1, move || {
                     let query = query_res?;
                     let path = query.path;
+                    let from_state_roots = query.from_state_roots.unwrap_or(false);
                     let (mut state_, _execution_optimistic, _finalized) = state_id.state(&chain)?;
 
                     // Apply pending mutations to make sure we can generate tree_root_hash for slots which are not in LRU cache (e.g. historical slots)
@@ -2664,7 +2665,7 @@ pub fn serve<T: BeaconChainTypes>(
 
                     let spec_id = T::EthSpec::spec_name();
 
-                    let proof_and_witness = ssz_prove(state_, spec_id, path).map_err(|e| {
+                    let proof_and_witness = ssz_prove(state_, spec_id, path, from_state_roots).map_err(|e| {
                         warp_utils::reject::custom_server_error(format!(
                             "Merkelization Error {:?}",
                             e

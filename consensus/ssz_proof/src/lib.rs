@@ -20,7 +20,7 @@ pub struct ProofAndWitness {
     witness: [u8; 32],
 }
 
-fn generate_proof_and_witnes<
+fn generate_proof_and_witness<
     const SLOTS_PER_HISTORICAL_ROOT: usize,
     const HISTORICAL_ROOTS_LIMIT: usize,
     const BYTES_PER_LOGS_BLOOM: usize,
@@ -33,14 +33,20 @@ fn generate_proof_and_witnes<
         MAX_EXTRA_DATA_BYTES,
     >,
     path: &Vec<PathElement>,
+    from_state_roots: bool,
 ) -> Result<ProofAndWitness, MerkleizationError> {
-    let (proof, witness) = match state {
-        BeaconStateSummary::Base(state) => state.prove(&path)?,
-        BeaconStateSummary::Altair(state) => state.prove(&path)?,
-        BeaconStateSummary::Bellatrix(state) => state.prove(&path)?,
-        BeaconStateSummary::Capella(state) => state.prove(&path)?,
-        BeaconStateSummary::Deneb(state) => state.prove(&path)?,
-        BeaconStateSummary::Electra(_) => todo!(),
+    let (proof, witness) = if from_state_roots {
+        let state_roots = state.state_roots();
+        state_roots.prove(&path)?
+    } else {
+        match state {
+            BeaconStateSummary::Base(state) => state.prove(&path)?,
+            BeaconStateSummary::Altair(state) => state.prove(&path)?,
+            BeaconStateSummary::Bellatrix(state) => state.prove(&path)?,
+            BeaconStateSummary::Capella(state) => state.prove(&path)?,
+            BeaconStateSummary::Deneb(state) => state.prove(&path)?,
+            BeaconStateSummary::Electra(_) => todo!(),
+        }
     };
 
     let proof_and_witness = ProofAndWitness {
@@ -58,6 +64,7 @@ pub fn ssz_prove<E: EthSpec>(
     state: BeaconState<E>,
     spec_id: EthSpecId,
     path: Vec<String>,
+    from_states_root: bool,
 ) -> Result<ProofAndWitness, MerkleizationError> {
     let path: Vec<PathElement> = path
         .into_iter()
@@ -77,7 +84,7 @@ pub fn ssz_prove<E: EthSpec>(
                 { MainnetParams::MAX_EXTRA_DATA_BYTES },
             >::from(state);
 
-            generate_proof_and_witnes(state, &path)
+            generate_proof_and_witness(state, &path, from_states_root)
         }
         EthSpecId::Minimal => {
             let state = BeaconStateSummary::<
@@ -86,7 +93,7 @@ pub fn ssz_prove<E: EthSpec>(
                 { MinimalParams::BYTES_PER_LOGS_BLOOM },
                 { MinimalParams::MAX_EXTRA_DATA_BYTES },
             >::from(state);
-            generate_proof_and_witnes(state, &path)
+            generate_proof_and_witness(state, &path, from_states_root)
         }
         EthSpecId::Gnosis => {
             todo!();
