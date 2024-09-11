@@ -2664,7 +2664,11 @@ pub fn serve<T: BeaconChainTypes>(
 
                     let spec_id = T::EthSpec::spec_name();
 
-                    let proof_and_witness = ssz_prove(state_, spec_id, path);
+                    let proof_and_witness = ssz_prove(state_, spec_id, path).map_err(|e| {
+                           warp_utils::reject::custom_server_error(
+                            format!("Merkelization Error {:?}", e)
+                        )
+                    })?;
 
                     Ok(add_consensus_version_header(
                         warp::reply::json(&proof_and_witness).into_response(),
