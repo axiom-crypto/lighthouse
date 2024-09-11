@@ -59,7 +59,15 @@ pub fn ssz_prove<E: EthSpec>(
     spec_id: EthSpecId,
     path: Vec<String>,
 ) -> Result<ProofAndWitness, MerkleizationError> {
-    let path: Vec<PathElement> = path.into_iter().map(PathElement::Field).collect();
+    let path: Vec<PathElement> = path
+        .into_iter()
+        .map(|segment| {
+            segment
+                .parse::<usize>()
+                .map(PathElement::from)
+                .unwrap_or_else(|_| PathElement::from(segment.as_str()))
+        })
+        .collect();
     match spec_id {
         EthSpecId::Mainnet => {
             let state = BeaconStateSummary::<
