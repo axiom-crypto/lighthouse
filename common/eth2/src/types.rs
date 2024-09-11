@@ -498,7 +498,7 @@ pub struct AttestationPoolQuery {
 #[derive(Serialize, Deserialize)]
 pub struct SszQuery {
     pub path: Vec<String>,
-    pub from_state_roots: Option<bool>
+    pub from_state_roots: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]

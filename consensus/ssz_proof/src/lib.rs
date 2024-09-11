@@ -64,7 +64,7 @@ pub fn ssz_prove<E: EthSpec>(
     state: BeaconState<E>,
     spec_id: EthSpecId,
     path: Vec<String>,
-    from_states_root: bool,
+    from_state_roots: bool,
 ) -> Result<ProofAndWitness, MerkleizationError> {
     let path: Vec<PathElement> = path
         .into_iter()
@@ -84,7 +84,7 @@ pub fn ssz_prove<E: EthSpec>(
                 { MainnetParams::MAX_EXTRA_DATA_BYTES },
             >::from(state);
 
-            generate_proof_and_witness(state, &path, from_states_root)
+            generate_proof_and_witness(state, &path, from_state_roots)
         }
         EthSpecId::Minimal => {
             let state = BeaconStateSummary::<
@@ -93,7 +93,7 @@ pub fn ssz_prove<E: EthSpec>(
                 { MinimalParams::BYTES_PER_LOGS_BLOOM },
                 { MinimalParams::MAX_EXTRA_DATA_BYTES },
             >::from(state);
-            generate_proof_and_witness(state, &path, from_states_root)
+            generate_proof_and_witness(state, &path, from_state_roots)
         }
         EthSpecId::Gnosis => {
             todo!();

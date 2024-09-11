@@ -2640,17 +2640,26 @@ pub fn serve<T: BeaconChainTypes>(
         .and(task_spawner_filter.clone())
         .and(chain_filter.clone())
         .and(multi_key_query::<api_types::SszQuery>())
+        .and(log_filter.clone())
         .then(
             |endpoint_version: EndpointVersion,
              state_id: StateId,
              accept_header: Option<api_types::Accept>,
              task_spawner: TaskSpawner<T::EthSpec>,
              chain: Arc<BeaconChain<T>>,
-             query_res: Result<api_types::SszQuery, warp::Rejection>| {
+             query_res: Result<api_types::SszQuery, warp::Rejection>,
+             log: Logger| {
                 task_spawner.blocking_response_task(Priority::P1, move || {
                     let query = query_res?;
                     let path = query.path;
                     let from_state_roots = query.from_state_roots.unwrap_or(false);
+
+                    debug!(
+                        log,
+                        "Get ssz proof";
+                        "from_state_roots" => from_state_roots
+                    );
+
                     let (mut state_, _execution_optimistic, _finalized) = state_id.state(&chain)?;
 
                     // Apply pending mutations to make sure we can generate tree_root_hash for slots which are not in LRU cache (e.g. historical slots)
@@ -2665,12 +2674,13 @@ pub fn serve<T: BeaconChainTypes>(
 
                     let spec_id = T::EthSpec::spec_name();
 
-                    let proof_and_witness = ssz_prove(state_, spec_id, path, from_state_roots).map_err(|e| {
-                        warp_utils::reject::custom_server_error(format!(
-                            "Merkelization Error {:?}",
-                            e
-                        ))
-                    })?;
+                    let proof_and_witness = ssz_prove(state_, spec_id, path, from_state_roots)
+                        .map_err(|e| {
+                            warp_utils::reject::custom_server_error(format!(
+                                "Merkelization Error {:?}",
+                                e
+                            ))
+                        })?;
 
                     Ok(add_consensus_version_header(
                         warp::reply::json(&proof_and_witness).into_response(),
