@@ -1,7 +1,7 @@
 use beacon_state_summary::{encode_node, BeaconStateSummary};
 use network_params::{MainnetParams, MinimalParams, NetworkParams};
 use serde::{Deserialize, Serialize};
-use ssz_rs::PathElement;
+use ssz_rs::{MerkleizationError, PathElement};
 use types::{BeaconState, EthSpec, EthSpecId};
 mod beacon_state_summary;
 mod network_params;
@@ -33,13 +33,13 @@ fn generate_proof_and_witnes<
         MAX_EXTRA_DATA_BYTES,
     >,
     path: &Vec<PathElement>,
-) -> ProofAndWitness {
+) -> Result<ProofAndWitness, MerkleizationError> {
     let (proof, witness) = match state {
-        BeaconStateSummary::Base(state) => state.prove(&path).unwrap(),
-        BeaconStateSummary::Altair(state) => state.prove(&path).unwrap(),
-        BeaconStateSummary::Bellatrix(state) => state.prove(&path).unwrap(),
-        BeaconStateSummary::Capella(state) => state.prove(&path).unwrap(),
-        BeaconStateSummary::Deneb(state) => state.prove(&path).unwrap(),
+        BeaconStateSummary::Base(state) => state.prove(&path)?,
+        BeaconStateSummary::Altair(state) => state.prove(&path)?,
+        BeaconStateSummary::Bellatrix(state) => state.prove(&path)?,
+        BeaconStateSummary::Capella(state) => state.prove(&path)?,
+        BeaconStateSummary::Deneb(state) => state.prove(&path)?,
         BeaconStateSummary::Electra(_) => todo!(),
     };
 
@@ -51,15 +51,23 @@ fn generate_proof_and_witnes<
         },
         witness: *witness,
     };
-    proof_and_witness
+    Ok(proof_and_witness)
 }
 
 pub fn ssz_prove<E: EthSpec>(
     state: BeaconState<E>,
     spec_id: EthSpecId,
     path: Vec<String>,
-) -> ProofAndWitness {
-    let path: Vec<PathElement> = path.into_iter().map(PathElement::Field).collect();
+) -> Result<ProofAndWitness, MerkleizationError> {
+    let path: Vec<PathElement> = path
+        .into_iter()
+        .map(|segment| {
+            segment
+                .parse::<usize>()
+                .map(PathElement::from)
+                .unwrap_or_else(|_| PathElement::from(segment.as_str()))
+        })
+        .collect();
     match spec_id {
         EthSpecId::Mainnet => {
             let state = BeaconStateSummary::<
