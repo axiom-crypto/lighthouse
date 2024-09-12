@@ -498,7 +498,24 @@ pub struct AttestationPoolQuery {
 #[derive(Serialize, Deserialize)]
 pub struct SszQuery {
     pub path: Vec<String>,
+    #[serde(deserialize_with = "bool_from_str")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub from_state_roots: Option<bool>,
+}
+
+fn bool_from_str<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let opt_str = Option::<String>::deserialize(deserializer)?;
+    match opt_str {
+        Some(s) => match s.as_str() {
+            "true" => Ok(Some(true)),
+            "false" => Ok(Some(false)),
+            _ => Err(serde::de::Error::custom("Invalid boolean value")),
+        },
+        None => Ok(None),
+    }
 }
 
 #[derive(Debug, Deserialize)]
