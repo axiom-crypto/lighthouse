@@ -79,6 +79,7 @@ use tokio_stream::{
 };
 
 use ssz_proof::ssz_prove;
+use std::panic::{self, AssertUnwindSafe};
 use types::{
     fork_versioned_response::EmptyMetadata, Attestation, AttestationData, AttestationShufflingId,
     AttesterSlashing, BeaconStateError, CommitteeCache, ConfigAndPreset, Epoch, EthSpec, ForkName,
@@ -2650,42 +2651,56 @@ pub fn serve<T: BeaconChainTypes>(
              query_res: Result<api_types::SszQuery, warp::Rejection>,
              log: Logger| {
                 task_spawner.blocking_response_task(Priority::P1, move || {
-                    let query = query_res?;
-                    let path = query.path;
-                    let from_state_roots = query.from_state_roots.unwrap_or(false);
+                    // Wrap the handler in a panic catcher
+                    match std::panic::catch_unwind(AssertUnwindSafe(|| {
+                        let query = query_res?;
+                        let path = query.path;
+                        let from_state_roots = query.from_state_roots.unwrap_or(false);
 
-                    debug!(
-                        log,
-                        "Get ssz proof";
-                        "from_state_roots" => from_state_roots
-                    );
+                        debug!(
+                            log,
+                            "Get ssz proof";
+                            "from_state_roots" => from_state_roots
+                        );
 
-                    let (mut state_, _execution_optimistic, _finalized) = state_id.state(&chain)?;
+                        let (mut state_, _execution_optimistic, _finalized) =
+                            state_id.state(&chain)?;
 
-                    // Apply pending mutations to make sure we can generate tree_root_hash for slots which are not in LRU cache (e.g. historical slots)
-                    state_.apply_pending_mutations().map_err(|_| {
-                        warp_utils::reject::custom_server_error(
-                            "Failed to apply pending mutations".to_owned(),
-                        )
-                    })?;
-                    let fork_name = state_
-                        .fork_name(&chain.spec)
-                        .map_err(inconsistent_fork_rejection)?;
-
-                    let spec_id = T::EthSpec::spec_name();
-
-                    let proof_and_witness = ssz_prove(state_, spec_id, path, from_state_roots)
-                        .map_err(|e| {
-                            warp_utils::reject::custom_server_error(format!(
-                                "Merkelization Error {:?}",
-                                e
-                            ))
+                        state_.apply_pending_mutations().map_err(|_| {
+                            warp_utils::reject::custom_server_error(
+                                "Failed to apply pending mutations".to_owned(),
+                            )
                         })?;
+                        let fork_name = state_
+                            .fork_name(&chain.spec)
+                            .map_err(inconsistent_fork_rejection)?;
 
-                    Ok(add_consensus_version_header(
-                        warp::reply::json(&proof_and_witness).into_response(),
-                        fork_name,
-                    ))
+                        let spec_id = T::EthSpec::spec_name();
+
+                        let proof_and_witness = ssz_prove(state_, spec_id, path, from_state_roots)
+                            .map_err(|e| {
+                                warp_utils::reject::custom_server_error(format!(
+                                    "Merkelization Error {:?}",
+                                    e
+                                ))
+                            })?;
+
+                        Ok(add_consensus_version_header(
+                            warp::reply::json(&proof_and_witness).into_response(),
+                            fork_name,
+                        ))
+                    })) {
+                        // If no panic occurred, return the Ok result
+                        Ok(result) => result,
+                        // If a panic occurred, return a 500 Internal Server Error
+                        Err(e) => {
+                            error!(log, "Error in getting ssz proof");
+                            Err(warp_utils::reject::custom_server_error(format!(
+                                "Failed to get ssz proof {:?}",
+                                e
+                            )))
+                        }
+                    }
                 })
             },
         );
