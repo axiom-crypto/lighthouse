@@ -56,6 +56,7 @@ members = [
     "consensus/fork_choice",
     "consensus/proto_array",
     "consensus/safe_arith",
+    "consensus/ssz_proof",
     "consensus/state_processing",
     "consensus/swap_or_not_shuffle",
 
@@ -103,6 +104,7 @@ bitvec = "1"
 byteorder = "1"
 bytes = "1"
 clap = "2"
+c-kzg = "1"
 compare_fields_derive = { path = "common/compare_fields_derive" }
 criterion = "0.3"
 crossbeam-channel = "0.5.8"
@@ -164,7 +166,7 @@ syn = "1"
 sysinfo = "0.26"
 tempfile = "3"
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "signal"] }
-tokio-stream = { version = "0.1", features = ["sync"] }
+tokio-stream = { version = "0.1.15", features = ["sync"] }
 tokio-util = { version = "0.6", features = ["codec", "compat", "time"] }
 tracing = "0.1.40"
 tracing-appender = "0.2"
@@ -231,6 +233,7 @@ store = { path = "beacon_node/store" }
 swap_or_not_shuffle = { path = "consensus/swap_or_not_shuffle" }
 task_executor = { path = "common/task_executor" }
 types = { path = "consensus/types" }
+ssz_proof = { path = "consensus/ssz_proof" }
 unused_port = { path = "common/unused_port" }
 validator_client = { path = "validator_client" }
 validator_dir = { path = "common/validator_dir" }

@@ -9,6 +9,7 @@ perf.data*
 *.tar.gz
 /bin
 genesis.ssz
+*.ssz
 /clippy.toml
 /.cargo
 
